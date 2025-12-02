@@ -1,0 +1,207 @@
+Week 1: Project Foundation & Backend Setup
+
+Goal: Set up the skeleton, database, basic models, and data ingestion.
+
+Day 1: Project Setup
+
+Initialize Django project + Git repository.
+
+Create virtual environment, install dependencies (Django, DRF, Celery, Redis, PostgreSQL, HuggingFace / OpenAI client, pandas, requests).
+
+Set up GitHub repo and Git workflow.
+
+Create docker-compose.yml for DB + Redis + Django dev server.
+
+Scaffold basic Django apps: users, data_ingestion, analysis.
+
+Day 2: Database Schema Design
+
+Design PostgreSQL schema:
+
+Users (with roles: admin, analyst, viewer)
+
+Business Entities (optional)
+
+RawFeedback (text, source, timestamp)
+
+ProcessedFeedback (sentiment, topics, embeddings, timestamp)
+
+Insights / Recommendations (text, score, timestamp)
+
+Create migrations & test DB connection.
+
+Day 3: User Authentication
+
+Implement Django REST JWT authentication.
+
+Role-based access control for API endpoints.
+
+Create basic endpoints: login, signup, get profile.
+
+Day 4: Data Ingestion Skeleton
+
+Create models for RawFeedback.
+
+Build API endpoint to submit new feedback manually.
+
+Write simple data ingestion script for scraping open datasets / sample feedback (e.g., CSV of reviews, Reddit posts, Twitter via API).
+
+Day 5: Celery Setup
+
+Integrate Celery + Redis for background tasks.
+
+Test a simple task (e.g., print feedback text every 10 seconds).
+
+Connect Celery to Django and Docker-compose.
+
+Day 6–7: Initial Feedback Pipeline
+
+Create a Celery task to process new feedback:
+
+Save to DB
+
+Placeholder for AI analysis
+
+Test end-to-end: ingest feedback → Celery task → store processed feedback.
+
+Week 2: AI Integration
+
+Goal: Implement NLP pipeline: sentiment analysis, topic extraction, embeddings.
+
+Day 8: Sentiment Analysis
+
+Integrate HuggingFace or OpenAI sentiment analysis model.
+
+Create a Python module: input = feedback text, output = sentiment score.
+
+Test on sample data.
+
+Day 9: Topic Extraction
+
+Implement keyword / topic extraction (TF-IDF, YAKE, or embedding-based clustering).
+
+Store extracted topics in ProcessedFeedback.
+
+Day 10: Summarization
+
+Integrate summarization model (HuggingFace / OpenAI GPT).
+
+Generate daily / weekly summary from processed feedback.
+
+Day 11: Embeddings for Similarity
+
+Generate embeddings for each feedback text.
+
+Store embeddings in DB (PostgreSQL + pgvector or simple numpy array).
+
+Day 12–13: Feedback Processing Pipeline
+
+Combine sentiment, topics, embeddings, summary into one Celery task.
+
+Ensure async processing works for multiple feedback entries.
+
+Day 14: Testing AI Pipeline
+
+Test with 50–100 sample feedback entries.
+
+Verify sentiment, topics, summaries, embeddings are stored correctly.
+
+Debug and optimize Celery + DB integration.
+
+Week 3: Insights & Dashboard
+
+Goal: Turn processed data into actionable insights.
+
+Day 15–16: Generate Insights
+
+Write Python functions to:
+
+Detect recurring complaints or praise topics.
+
+Identify critical negative feedback (threshold-based).
+
+Suggest actionable recommendations (e.g., “Product X: Improve delivery speed”).
+
+Store results in Insights table.
+
+Day 17–18: API Endpoints
+
+Create REST API endpoints for:
+
+Fetch processed feedback
+
+Fetch AI insights / recommendations
+
+Fetch sentiment & topic analytics
+
+Add pagination & filters (by date, product, source, sentiment).
+
+Day 19–20: Dashboard Backend
+
+Add endpoints for charts:
+
+Sentiment trends over time
+
+Top topics / complaints
+
+Summary reports
+
+Optional: simple CSV export endpoint.
+
+Day 21: Dockerize AI Pipeline
+
+Create Docker container for Celery worker + AI modules.
+
+Update docker-compose to run Django API + DB + Redis + AI worker.
+
+Test end-to-end with Docker.
+
+Week 4: Frontend & Deployment
+
+Goal: Build dashboard, finalize deployment, polish project.
+
+Day 22–23: Frontend Dashboard
+
+Optional React / Tailwind dashboard (or Streamlit for speed).
+
+Show:
+
+Sentiment trends
+
+Topic clouds
+
+Insights / recommendations
+
+Alerts for critical feedback
+
+Connect dashboard to Django REST API.
+
+Day 24: Real-Time Alerts
+
+Add WebSocket or polling for near real-time alerts.
+
+Trigger email / Slack notification when critical feedback arrives.
+
+Day 25–26: Testing & QA
+
+Unit tests for backend endpoints.
+
+Test Celery tasks for large batch of feedback.
+
+Test Docker containers in production mode.
+
+Day 27: Deployment
+
+Deploy to cloud (Render / Railway / AWS / Heroku).
+
+Ensure Docker containers run correctly.
+
+Test end-to-end: feedback ingestion → AI processing → dashboard → alert.
+
+Day 28: Polish & Documentation
+
+Write README with project overview, architecture diagram, setup instructions.
+
+Add screenshots of dashboard, AI outputs.
+
+Prepare for GitHub showcase / portfolio.

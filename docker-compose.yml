@@ -28,5 +28,23 @@ services:
       - db
       - redis
 
+  celery:
+    build: .
+    command: celery -A core worker -l info
+    volumes:
+      - .:/code
+    depends_on:
+      - web
+      - redis
+
+  celery-beat:
+    build: .
+    command: celery -A core beat -l info
+    volumes:
+      - .:/code
+    depends_on:
+      - web
+      - redis
+
 volumes:
   postgres_data:

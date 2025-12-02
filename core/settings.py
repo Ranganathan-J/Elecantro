@@ -99,8 +99,14 @@ else:
             'HOST': os.getenv("LOCAL_DB_HOST"),
             'PORT': os.getenv("LOCAL_DB_PORT"),
         }
-    }
+}
 
+# DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.sqlite3',
+#             'NAME': BASE_DIR / 'db.sqlite3',
+#         }
+# }
 
 
 # Password validation
@@ -153,6 +159,7 @@ AUTH_USER_MODEL = 'users.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -185,3 +192,12 @@ SIMPLE_JWT = {
 # SWAGGER_SETTINGS = {
 #     'DEFAULT_API_URL': 'https://glowing-robot-v6v49gg4g4w92x5xw-8000.app.github.dev',
 # }
+
+
+
+# adding Celery settings
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'

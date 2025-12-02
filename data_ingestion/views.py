@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import BusinessEntity, RawFeed
@@ -7,7 +7,7 @@ from .serializer import BusinessEntitySerializer, RawFeedSerializer
 # Create your views here.
 
 #submit raw feed data
-class SubmitRawFeedView(APIView):
+class SubmitRawFeedView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         serializer = RawFeedSerializer(data=request.data)
         if serializer.is_valid():
