@@ -3,14 +3,14 @@ version: "3.9"
 services:
   # PostgreSQL Database
   db:
-    image: postgres:15
+    image: postgres:17
     container_name: feedback_db
     environment:
-      POSTGRES_DB: feedback_db
+      POSTGRES_DB: railway
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
     ports:
-      - "5432:5432"
+      - "54381:54381"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
     image: redis:7-alpine
     container_name: feedback_redis
     ports:
-      - "6379:6379"
+      - "37661:37661"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -41,15 +41,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ENV=local
+      - ENV=railway
       - DEBUG=True
       - DB_NAME=feedback_db
       - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_HOST=db
-      - DB_PORT=5432
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DB_PASSWORD=arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
+      - DB_HOST=postgres.railway.internal
+      - DB_PORT=54381
+      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
+      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
     depends_on:
       db:
         condition: service_healthy
@@ -64,15 +64,15 @@ services:
     volumes:
       - .:/code
     environment:
-      - ENV=local
+      - ENV=railway
       - DEBUG=True
       - DB_NAME=feedback_db
       - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_HOST=db
-      - DB_PORT=5432
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DB_PASSWORD=arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
+      - DB_HOST=postgres.railway.internal
+      - DB_PORT=54381
+      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
+      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
     depends_on:
       - web
       - redis
@@ -85,15 +85,15 @@ services:
     volumes:
       - .:/code
     environment:
-      - ENV=local
+      - ENV=railway
       - DEBUG=True
       - DB_NAME=feedback_db
       - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_HOST=db
-      - DB_PORT=5432
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DB_PASSWORD=arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
+      - DB_HOST=postgres.railway.internal
+      - DB_PORT=54381
+      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
+      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
     depends_on:
       - web
       - redis
@@ -106,8 +106,8 @@ services:
     ports:
       - "5555:5555"
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
+      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
     depends_on:
       - redis
       - celery_worker

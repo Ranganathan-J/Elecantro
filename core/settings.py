@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'analysis',
     'drf_yasg',
     'django_extensions',
+    'django_celery_beat'
 ]
 
 MIDDLEWARE = [
