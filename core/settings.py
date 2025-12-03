@@ -196,8 +196,8 @@ SWAGGER_SETTINGS = {
 
 
 # adding Celery settings
-# CELERY_BROKER_URL = "redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661"
-# CELERY_RESULT_BACKEND = "redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661"
+# CELERY_BROKER_URL = ""
+# CELERY_RESULT_BACKEND = ""
 # CELERY_ACCEPT_CONTENT = ['json']
 # CELERY_TASK_SERIALIZER = 'json'
 # CELERY_RESULT_SERIALIZER = 'json'
@@ -211,8 +211,8 @@ SWAGGER_SETTINGS = {
 # Add these settings to your core/settings.py file
 
 # Celery Broker and Backend
-CELERY_BROKER_URL = "redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661"
-CELERY_RESULT_BACKEND = "redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661"
+CELERY_BROKER_URL =  os.getenv("RAILWAY_REDIS_URL")
+CELERY_RESULT_BACKEND = os.getenv("RAILWAY_REDIS_URL")
 # Celery Task Serialization
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
