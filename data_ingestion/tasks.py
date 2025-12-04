@@ -70,86 +70,43 @@ def long_running_task(duration=10):
 
 # ==================== DAY 6-7: FEEDBACK PROCESSING ====================
 
+# REPLACE the process_feedback task in data_ingestion/tasks.py with this:
+
 @shared_task(bind=True, max_retries=3)
-def process_feedback(self, feedback_id):
+def process_feedback_with_ai(self, feedback_id):
     """
-    Main task to process a single feedback.
+    Process feedback with REAL AI models (Days 8-13).
     
-    This task:
-    1. Updates status to 'processing'
-    2. Performs AI analysis (placeholder for now)
-    3. Creates ProcessedFeedback record
-    4. Updates status to 'processed'
+    This replaces the placeholder version with actual HuggingFace models.
     
     Args:
         feedback_id: ID of the RawFeed to process
     """
     from data_ingestion.models import RawFeed
     from analysis.models import ProcessedFeedback
+    from analysis.ai_processor import get_ai_processor
     
     start_time = time.time()
     
     try:
-        # Get the raw feedback with lock
+        # Get the raw feedback
         raw_feed = RawFeed.objects.select_for_update().get(id=feedback_id)
         
-        logger.info(f"📝 Processing feedback #{feedback_id}")
+        logger.info(f"🤖 AI Processing feedback #{feedback_id}")
         
-        # Update status to processing
+        # Update status
         raw_feed.status = 'processing'
         raw_feed.save(update_fields=['status'])
         
-        # ==================== PLACEHOLDER AI ANALYSIS ====================
-        # For now, we'll use simple placeholder logic
-        # In Week 2, we'll replace this with real AI models
+        # ==================== REAL AI PROCESSING ====================
         
-        # Simulate processing time
-        time.sleep(2)
+        # Get AI processor (singleton, models loaded once)
+        processor = get_ai_processor()
         
-        # Simple sentiment analysis (placeholder)
-        text_lower = raw_feed.text.lower()
+        # Run complete AI pipeline
+        ai_results = processor.process_feedback_complete(raw_feed.text)
         
-        # Determine sentiment based on keywords
-        positive_words = ['great', 'excellent', 'amazing', 'love', 'perfect', 'good', 'best']
-        negative_words = ['bad', 'terrible', 'awful', 'hate', 'worst', 'poor', 'disappointed']
-        
-        positive_count = sum(1 for word in positive_words if word in text_lower)
-        negative_count = sum(1 for word in negative_words if word in text_lower)
-        
-        if positive_count > negative_count:
-            sentiment = 'positive'
-            sentiment_score = min(0.6 + (positive_count * 0.1), 0.95)
-        elif negative_count > positive_count:
-            sentiment = 'negative'
-            sentiment_score = min(0.6 + (negative_count * 0.1), 0.95)
-        else:
-            sentiment = 'neutral'
-            sentiment_score = 0.5
-        
-        # Extract simple topics (placeholder)
-        topics = []
-        if 'delivery' in text_lower:
-            topics.append('delivery')
-        if 'quality' in text_lower or 'product' in text_lower:
-            topics.append('product_quality')
-        if 'price' in text_lower or 'cost' in text_lower:
-            topics.append('pricing')
-        if 'service' in text_lower or 'support' in text_lower:
-            topics.append('customer_service')
-        
-        if not topics:
-            topics = ['general']
-        
-        # Simple embeddings (placeholder - just random numbers)
-        embeddings = [random.random() for _ in range(10)]
-        
-        # Generate simple summary
-        summary = raw_feed.text[:150] + '...' if len(raw_feed.text) > 150 else raw_feed.text
-        
-        # Key phrases (placeholder)
-        key_phrases = topics[:3]
-        
-        # ==================== END PLACEHOLDER ====================
+        # ==================== END AI PROCESSING ====================
         
         processing_time = time.time() - start_time
         
@@ -158,14 +115,16 @@ def process_feedback(self, feedback_id):
             processed, created = ProcessedFeedback.objects.update_or_create(
                 raw_feed=raw_feed,
                 defaults={
-                    'sentiment': sentiment,
-                    'sentiment_score': sentiment_score,
-                    'topics': topics,
-                    'embeddings': embeddings,
-                    'summary': summary,
-                    'key_phrases': key_phrases,
+                    'sentiment': ai_results['sentiment'],
+                    'sentiment_score': ai_results['sentiment_score'],
+                    'topics': ai_results['topics'],
+                    'embeddings': ai_results['embeddings'],
+                    'summary': ai_results['summary'],
+                    'key_phrases': ai_results['key_phrases'],
+                    'urgency': ai_results.get('urgency', 'medium'),
+                    'urgency_score': ai_results.get('urgency_score', 0.5),
                     'processing_time': processing_time,
-                    'model_version': 'placeholder_v1.0'
+                    'model_version': ai_results['model_version']
                 }
             )
             
@@ -175,16 +134,18 @@ def process_feedback(self, feedback_id):
             raw_feed.save(update_fields=['status', 'processed_at'])
         
         logger.info(
-            f"✅ Processed feedback #{feedback_id} in {processing_time:.2f}s "
-            f"- Sentiment: {sentiment} ({sentiment_score:.2f})"
+            f"✅ AI Processed feedback #{feedback_id} in {processing_time:.2f}s "
+            f"- Sentiment: {ai_results['sentiment']} ({ai_results['sentiment_score']:.2f}) "
+            f"- Urgency: {ai_results.get('urgency', 'N/A')}"
         )
         
         return {
             'status': 'success',
             'feedback_id': feedback_id,
-            'sentiment': sentiment,
-            'sentiment_score': sentiment_score,
-            'topics': topics,
+            'sentiment': ai_results['sentiment'],
+            'sentiment_score': ai_results['sentiment_score'],
+            'topics': ai_results['topics'],
+            'urgency': ai_results.get('urgency'),
             'processing_time': processing_time
         }
         
@@ -193,7 +154,7 @@ def process_feedback(self, feedback_id):
         return {'status': 'error', 'message': 'Feedback not found'}
         
     except Exception as e:
-        logger.error(f"❌ Error processing feedback #{feedback_id}: {str(e)}")
+        logger.error(f"❌ Error AI processing feedback #{feedback_id}: {str(e)}")
         
         # Update status to failed
         try:
@@ -204,8 +165,8 @@ def process_feedback(self, feedback_id):
         except:
             pass
         
-        # Retry the task with exponential backoff
-        retry_delay = 60 * (2 ** self.request.retries)  # 60s, 120s, 240s
+        # Retry the task
+        retry_delay = 60 * (2 ** self.request.retries)
         raise self.retry(exc=e, countdown=retry_delay)
 
 
@@ -417,3 +378,6 @@ def generate_daily_report():
     except Exception as e:
         logger.error(f"Error generating daily report: {str(e)}")
         return {'status': 'error', 'message': str(e)}
+    
+
+
