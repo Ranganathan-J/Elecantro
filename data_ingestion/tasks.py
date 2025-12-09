@@ -381,3 +381,99 @@ def generate_daily_report():
     
 
 
+
+
+@shared_task
+def generate_insights_task(entity_id=None, days_back=30):
+    """
+    Celery task to generate insights for entities.
+    
+    Args:
+        entity_id: Optional entity ID. If None, generates for all entities.
+        days_back: Number of days to analyze
+    """
+    from analysis.insights_generator import generate_insights_for_entity
+    from data_ingestion.models import BusinessEntity
+    
+    try:
+        if entity_id:
+            # Generate for specific entity
+            result = generate_insights_for_entity(entity_id, days_back)
+            logger.info(f"Generated insights for entity {entity_id}: {result}")
+            return result
+        else:
+            # Generate for all active entities
+            entities = BusinessEntity.objects.filter(is_active=True)
+            results = []
+            
+            for entity in entities:
+                try:
+                    result = generate_insights_for_entity(entity.id, days_back)
+                    results.append(result)
+                    logger.info(f"Generated insights for entity {entity.id}: {result}")
+                except Exception as e:
+                    logger.error(f"Failed to generate insights for entity {entity.id}: {str(e)}")
+            
+            total_generated = sum(r['total_generated'] for r in results)
+            total_saved = sum(r['total_saved'] for r in results)
+            
+            logger.info(f"Total insights generated: {total_generated}, saved: {total_saved}")
+            
+            return {
+                'entities_processed': len(results),
+                'total_generated': total_generated,
+                'total_saved': total_saved,
+                'results': results
+            }
+    
+    except Exception as e:
+        logger.error(f"Insight generation task failed: {str(e)}")
+        return {'status': 'error', 'message': str(e)}
+
+
+@shared_task
+def daily_insights_generation():
+    """
+    Periodic task to generate daily insights for all entities.
+    Run daily via Celery Beat.
+    """
+    logger.info("Starting daily insights generation")
+    return generate_insights_task.delay(entity_id=None, days_back=30)
+
+
+@shared_task
+def cleanup_old_insights():
+    """
+    Periodic task to deactivate old resolved insights.
+    Run weekly via Celery Beat.
+    """
+    from analysis.models import Insight
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    try:
+        # Deactivate resolved insights older than 90 days
+        cutoff_date = timezone.now() - timedelta(days=90)
+        
+        old_insights = Insight.objects.filter(
+            is_resolved=True,
+            resolved_at__lt=cutoff_date,
+            is_active=True
+        )
+        
+        count = old_insights.count()
+        
+        if count > 0:
+            old_insights.update(is_active=False)
+            logger.info(f"Deactivated {count} old resolved insights")
+        else:
+            logger.info("No old insights to clean up")
+        
+        return {
+            'status': 'success',
+            'deactivated_count': count
+        }
+        
+    except Exception as e:
+        logger.error(f"Insight cleanup failed: {str(e)}")
+        return {'status': 'error', 'message': str(e)}

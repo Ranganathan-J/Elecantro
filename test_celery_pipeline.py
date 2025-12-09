@@ -19,7 +19,7 @@ django.setup()
 from data_ingestion.models import RawFeed, BusinessEntity
 from analysis.models import ProcessedFeedback
 from data_ingestion.tasks import (
-    test_celery, add_numbers, process_feedback,
+    test_celery, add_numbers, process_feedback_with_ai as process_feedback,
     process_bulk_feedbacks
 )
 from django.contrib.auth import get_user_model

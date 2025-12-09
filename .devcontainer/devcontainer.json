@@ -1,0 +1,46 @@
+{
+  "name": "Django + Celery + Redis + Postgres (Docker Compose)",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "web",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-azuretools.vscode-docker",
+        "batisteo.vscode-django",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+
+  "remoteEnv": {
+    "DATABASE_URL": "${localEnv:RAILWAY_DB_URL}",
+    "REDIS_URL": "${localEnv:RAILWAY_REDIS_URL}",
+    // "SECRET_KEY": "${localEnv:SECRET_KEY}",
+    "DJANGO_DEBUG": "${localEnv:DJANGO_DEBUG}"
+  },
+
+  "forwardPorts": [
+    8000,
+    5555,
+    54381,
+    37661
+  ],
+
+  "postCreateCommand": "echo 'Dev container ready. Django + Celery + Redis + Postgres running via Docker Compose.'",
+
+  "settings": {
+    "python.defaultInterpreterPath": "myenv/bin/python"
+  }
+
+}

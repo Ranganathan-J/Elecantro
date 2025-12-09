@@ -29,6 +29,15 @@ app.conf.beat_schedule = {
         'task': 'data_ingestion.tasks.cleanup_old_feedbacks',
         'schedule': crontab(hour=2, minute=0),  # Every day at 2 AM
     },
+    # NEW: Insight generation tasks
+    'generate-daily-insights': {
+        'task': 'data_ingestion.tasks.daily_insights_generation',
+        'schedule': crontab(hour=6, minute=0),  # Every day at 6 AM
+    },
+    'cleanup-old-insights-weekly': {
+        'task': 'data_ingestion.tasks.cleanup_old_insights',
+        'schedule': crontab(hour=3, minute=0, day_of_week=1),  # Every Monday at 3 AM
+    },
 }
 
 @app.task(bind=True)

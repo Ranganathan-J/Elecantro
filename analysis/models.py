@@ -1,5 +1,5 @@
 from django.db import models
-from data_ingestion.models import RawFeed
+from data_ingestion.models import RawFeed, BusinessEntity
 
 
 class ProcessedFeedback(models.Model):
@@ -120,3 +120,147 @@ class ProcessedFeedback(models.Model):
     @property
     def embedding_dimension(self):
         return len(self.embeddings) if self.embeddings else 0
+
+
+class Insight(models.Model):
+    """
+    Actionable insights generated from processed feedback.
+    Days 15-16: Insights Generation
+    """
+    
+    TYPE_CHOICES = [
+        ('recurring_complaint', 'Recurring Complaint'),
+        ('recurring_praise', 'Recurring Praise'),
+        ('critical_feedback', 'Critical Feedback'),
+        ('product_issue', 'Product Issue'),
+        ('product_success', 'Product Success'),
+        ('sentiment_trend', 'Sentiment Trend'),
+        ('urgent_action', 'Urgent Action'),
+    ]
+    
+    SEVERITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('critical', 'Critical'),
+    ]
+    
+    # Relationships
+    entity = models.ForeignKey(
+        BusinessEntity,
+        on_delete=models.CASCADE,
+        related_name='insights',
+        help_text="Entity this insight belongs to"
+    )
+    
+    # Insight Details
+    type = models.CharField(
+        max_length=50,
+        choices=TYPE_CHOICES,
+        help_text="Type of insight"
+    )
+    severity = models.CharField(
+        max_length=20,
+        choices=SEVERITY_CHOICES,
+        default='medium',
+        help_text="Severity/priority level"
+    )
+    title = models.CharField(
+        max_length=255,
+        help_text="Insight title"
+    )
+    description = models.TextField(
+        help_text="Detailed description of the insight"
+    )
+    recommendation = models.TextField(
+        help_text="Actionable recommendations"
+    )
+    
+    # Metrics
+    metrics = models.JSONField(
+        default=dict,
+        help_text="Quantitative metrics supporting the insight"
+    )
+    
+    # Related Data
+    related_topics = models.JSONField(
+        default=list,
+        help_text="Related topics/keywords"
+    )
+    product_name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Related product (if applicable)"
+    )
+    sample_feedbacks = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Sample feedback examples"
+    )
+    
+    # Status Tracking
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this insight is still relevant"
+    )
+    is_resolved = models.BooleanField(
+        default=False,
+        help_text="Whether this insight has been addressed"
+    )
+    resolved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When insight was resolved"
+    )
+    resolved_notes = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Notes on how insight was resolved"
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When insight was generated"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Last update time"
+    )
+    
+    class Meta:
+        ordering = ['-created_at', '-severity']
+        indexes = [
+            models.Index(fields=['entity', 'type', 'is_active']),
+            models.Index(fields=['severity', 'is_active']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['is_resolved', 'severity']),
+        ]
+        verbose_name = "Insight"
+        verbose_name_plural = "Insights"
+    
+    def __str__(self):
+        return f"{self.get_severity_display()}: {self.title}"
+    
+    @property
+    def is_critical(self):
+        return self.severity == 'critical'
+    
+    @property
+    def is_high_priority(self):
+        return self.severity in ['high', 'critical']
+    
+    @property
+    def days_since_created(self):
+        from django.utils import timezone
+        return (timezone.now() - self.created_at).days
+    
+    def mark_resolved(self, notes=None):
+        """Mark insight as resolved"""
+        from django.utils import timezone
+        self.is_resolved = True
+        self.resolved_at = timezone.now()
+        if notes:
+            self.resolved_notes = notes
+        self.save()
