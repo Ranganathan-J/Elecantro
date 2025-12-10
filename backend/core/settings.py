@@ -30,8 +30,6 @@ SECRET_KEY = 'django-insecure-*fo$(mm@y)$nl^p4u-09)4htzg_x%^=bb!#$!!*e!2ezzh5j9q
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -51,9 +49,12 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'drf_spectacular',
     'drf_spectacular_sidecar',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",  
+    "django.middleware.common.CommonMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -89,20 +90,21 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 ENV = os.getenv("ENV", "local")
 if ENV == "railway":
+    db_url = os.getenv("RAILWAY_DB_URL") 
     DATABASES = {
-        'default': dj_database_url.parse(os.getenv("RAILWAY_DB_URL"))
+        "default": dj_database_url.parse(db_url, conn_max_age=600, ssl_require=True)
     }
 else:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv("LOCAL_DB_NAME"),
-            'USER': os.getenv("LOCAL_DB_USER"),
-            'PASSWORD': os.getenv("LOCAL_DB_PASSWORD"),
-            'HOST': os.getenv("LOCAL_DB_HOST"),
-            'PORT': os.getenv("LOCAL_DB_PORT"),
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME", "feedback_db"),
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
+            "HOST": os.getenv("DB_HOST", "db"),
+            "PORT": os.getenv("DB_PORT", "5432"),
         }
-}
+    }
 
 # DATABASES = {
 #         'default': {
@@ -251,6 +253,25 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
 # ==================== END CELERY CONFIGURATION ====================
 
+
+# Allow your React Codespace URL
+CORS_ALLOWED_ORIGINS = [
+    "https://orange-lamp-7v9q6rrqrj5wcp465.github.dev",
+    "https://shiny-fishstick-g4q9j5595j76hpgxg-3000.app.github.dev",
+    "http://localhost:3000"
+]
+
+# Allow cookies/auth if needed
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = True
+
+
+# Allow backend to be accessed from Codespaces
+ALLOWED_HOSTS = [
+    ".github.dev",      # allow all GitHub Codespaces
+    "localhost",
+    "127.0.0.1",
+]
 
 
 # File Upload Settings

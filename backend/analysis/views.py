@@ -841,12 +841,14 @@ class ProductAnalyticsView(APIView):
         return round(avg, 3) if avg else None
 
 
+    # In _get_top_topics and similar methods
     def _get_top_topics(self, queryset, top_n=5):
-        topic_counter = Counter()
-
-        for feedback in queryset:
-            for topic in feedback.topics:
-                topic_counter[topic] += 1
-
-        # Return list of tuples: [('topic1', count1), ...]
-        return topic_counter.most_common(top_n)
+        try:
+            topic_counter = Counter()
+            for feedback in queryset:
+                for topic in feedback.topics:
+                    topic_counter[topic] += 1
+            return topic_counter.most_common(top_n)
+        except Exception as e:
+            logger.error(f"Error getting top topics: {str(e)}")
+            return []  # Return empty list instead of crashing

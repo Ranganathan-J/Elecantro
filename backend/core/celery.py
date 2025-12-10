@@ -15,6 +15,9 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Auto-discover tasks from all installed apps
 app.autodiscover_tasks()
 
+app.conf.broker_connection_retry_on_startup = True
+
+
 # Configure periodic tasks
 app.conf.beat_schedule = {
     'print-feedback-every-10-seconds': {
