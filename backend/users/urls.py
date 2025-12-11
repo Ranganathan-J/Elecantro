@@ -6,13 +6,14 @@ from .views import (
     ChangePasswordView,
     UserLogoutView,
     UserListView,
-    UserDetailView,
+    UserDetailView, CustomTokenObtainPairView
 )
 
 urlpatterns = [
     # Authentication
     path('register/', UserRegistrationView.as_view(), name='user-register'),
-    path('login/', TokenObtainPairView.as_view(), name='user-login'),
+    path('login/', CustomTokenObtainPairView.as_view(), name='user-login'),
+    # path('login/', TokenObtainPairView.as_view(), name='user-login'), im commenting out because it uses the prebuild login
     path('logout/', UserLogoutView.as_view(), name='user-logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     

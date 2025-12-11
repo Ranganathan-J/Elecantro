@@ -166,6 +166,9 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
+     # FIX: Allow OPTIONS unauthenticated
+    'UNAUTHENTICATED_USER': None,
+
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
@@ -256,15 +259,15 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
 # Allow your React Codespace URL
 CORS_ALLOWED_ORIGINS = [
-    "https://orange-lamp-7v9q6rrqrj5wcp465.github.dev",
-    "https://shiny-fishstick-g4q9j5595j76hpgxg-3000.app.github.dev",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "https://glowing-adventure-jj56v44646jrfqjwq-5173.app.github.dev"
 ]
 
 # Allow cookies/auth if needed
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True
-
+# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_HEADERS = ["*"]
+CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
 
 # Allow backend to be accessed from Codespaces
 ALLOWED_HOSTS = [

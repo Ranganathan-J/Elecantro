@@ -76,42 +76,42 @@ def long_running_task(duration=10):
 def process_feedback_with_ai(self, feedback_id):
     """
     Process feedback with REAL AI models (Days 8-13).
-    
-    This replaces the placeholder version with actual HuggingFace models.
-    
-    Args:
-        feedback_id: ID of the RawFeed to process
+    FIXED: Wrapped select_for_update in atomic transaction
     """
     from data_ingestion.models import RawFeed
     from analysis.models import ProcessedFeedback
     from analysis.ai_processor import get_ai_processor
+    from django.db import transaction  # ← ADD THIS IMPORT
     
     start_time = time.time()
     
     try:
-        # Get the raw feedback
-        raw_feed = RawFeed.objects.select_for_update().get(id=feedback_id)
-        
-        logger.info(f"🤖 AI Processing feedback #{feedback_id}")
-        
-        # Update status
-        raw_feed.status = 'processing'
-        raw_feed.save(update_fields=['status'])
+        # ✅ FIX: Wrap select_for_update in atomic transaction
+        with transaction.atomic():
+            # Get the raw feedback with lock
+            raw_feed = RawFeed.objects.select_for_update().get(id=feedback_id)
+            
+            logger.info(f"🤖 AI Processing feedback #{feedback_id}")
+            
+            # Update status
+            raw_feed.status = 'processing'
+            raw_feed.save(update_fields=['status'])
         
         # ==================== REAL AI PROCESSING ====================
         
         # Get AI processor (singleton, models loaded once)
         processor = get_ai_processor()
         
-        # Run complete AI pipeline
+        # Run complete AI pipeline (outside transaction - can be slow)
         ai_results = processor.process_feedback_complete(raw_feed.text)
         
         # ==================== END AI PROCESSING ====================
         
         processing_time = time.time() - start_time
         
-        # Create or update ProcessedFeedback record
+        # ✅ FIX: Wrap database writes in atomic transaction
         with transaction.atomic():
+            # Create or update ProcessedFeedback record
             processed, created = ProcessedFeedback.objects.update_or_create(
                 raw_feed=raw_feed,
                 defaults={
@@ -156,18 +156,22 @@ def process_feedback_with_ai(self, feedback_id):
     except Exception as e:
         logger.error(f"❌ Error AI processing feedback #{feedback_id}: {str(e)}")
         
-        # Update status to failed
+        # Update status to failed (wrap in transaction)
         try:
-            raw_feed = RawFeed.objects.get(id=feedback_id)
-            raw_feed.status = 'failed'
-            raw_feed.error_message = str(e)
-            raw_feed.save(update_fields=['status', 'error_message'])
+            with transaction.atomic():
+                raw_feed = RawFeed.objects.get(id=feedback_id)
+                raw_feed.status = 'failed'
+                raw_feed.error_message = str(e)
+                raw_feed.save(update_fields=['status', 'error_message'])
         except:
             pass
         
         # Retry the task
         retry_delay = 60 * (2 ** self.request.retries)
         raise self.retry(exc=e, countdown=retry_delay)
+
+
+
 
 
 @shared_task

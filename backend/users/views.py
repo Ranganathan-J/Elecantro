@@ -6,12 +6,38 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from .serializers import (
     UserSerializer, UserCreateSerializer, 
-    UserUpdateSerializer, ChangePasswordSerializer
+    UserUpdateSerializer, ChangePasswordSerializer, UserLoginSerilazers
 )
 import logging
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = UserLoginSerilazers
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.user
+        tokens = serializer.validated_data
+
+        return Response({
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": getattr(user, 'role', ''),
+            },
+            "tokens": {
+                "access": tokens['access'],
+                "refresh": tokens['refresh'],
+            }
+        })
+
+
 
 
 class UserRegistrationView(generics.CreateAPIView):

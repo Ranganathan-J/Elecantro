@@ -1,6 +1,18 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from .models import User
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+
+class UserLoginSerilazers(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Add custom claims to the token
+        token['username'] = user.username
+        token['role'] = getattr(user, 'role', '')
+        return token
 
 
 class UserSerializer(serializers.ModelSerializer):
