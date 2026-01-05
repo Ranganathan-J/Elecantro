@@ -1,18 +1,23 @@
 # Quick Start Guide - Elecantro
 
-## 🚀 EASIEST WAY - One-Click Startup
+## 🐳 DOCKER WAY - Containerized Startup
 
-**Just double-click:** `START_ALL.bat` in the project root folder!
+If you have Docker installed, this is the most reliable way to run everything:
 
-This will automatically start:
-- ✅ Django Backend Server
-- ✅ Celery Worker (for file processing)
-- ✅ React Frontend
-- ✅ Optionally start Redis via Docker
+```bash
+docker-compose up --build
+```
 
-Then open your browser to: **http://localhost:5173**
+This will start:
+- ✅ **PostgreSQL Database**
+- ✅ **Redis**
+- ✅ **Django Backend** (http://localhost:8000)
+- ✅ **Celery Worker** (Background AI processing)
+- ✅ **React Frontend** (http://localhost:5173 or http://localhost)
 
 ---
+
+## 🚀 EASIEST WAY - One-Click Startup (Windows)
 
 ## Manual Startup (If Needed)
 

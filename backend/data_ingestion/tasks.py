@@ -175,11 +175,11 @@ def process_feedback_with_ai(self, feedback_id):
 
 
 @shared_task(bind=True, max_retries=3)
-def process_batch_task(self, feedback_ids):
+def process_batch_task(self, feedback_ids, batch_id=None):
     """
     Process a small batch of feedbacks (e.g. 20-50) using batch AI inference.
     """
-    from data_ingestion.models import RawFeed
+    from data_ingestion.models import RawFeed, FeedbackBatch
     from analysis.models import ProcessedFeedback
     from analysis.ai_processor import get_ai_processor
     from django.db import transaction
@@ -242,6 +242,18 @@ def process_batch_task(self, feedback_ids):
             # Bulk update raw feeds
             RawFeed.objects.bulk_update(raw_feed_updates, ['status', 'processed_at'])
 
+        # Check if entire batch is complete
+        if batch_id:
+            batch = FeedbackBatch.objects.get(id=batch_id)
+            total_expected = batch.successful_rows
+            processed_now = RawFeed.objects.filter(batch_id=batch_id, status='processed').count()
+            
+            if processed_now >= total_expected:
+                batch.status = 'completed'
+                batch.completed_at = timezone.now()
+                batch.save(update_fields=['status', 'completed_at'])
+                logger.info(f"🏁 Batch #{batch_id} fully completed!")
+
         logger.info(f"✅ Batch processed {len(processed_objects)} feedbacks successfully")
         return {'status': 'success', 'processed': len(processed_objects)}
         
@@ -256,12 +268,13 @@ def process_batch_task(self, feedback_ids):
 
 
 @shared_task
-def process_bulk_feedbacks(feedback_ids):
+def process_bulk_feedbacks(feedback_ids, batch_id=None):
     """
     Process multiple feedbacks in bulk by splitting into efficient batches.
     
     Args:
         feedback_ids: List of RawFeed IDs to process
+        batch_id: The ID of the FeedbackBatch associated
     """
     BATCH_SIZE = 20  # Process 20 items per task to optimize AI batching
     
@@ -279,7 +292,7 @@ def process_bulk_feedbacks(feedback_ids):
     
     for chunk in chunks:
         try:
-            process_batch_task.delay(chunk)
+            process_batch_task.delay(chunk, batch_id=batch_id)
             results['queued_batches'] += 1
         except Exception as e:
             logger.error(f"Failed to queue batch: {str(e)}")

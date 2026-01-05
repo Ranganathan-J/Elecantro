@@ -1,116 +1,91 @@
 version: "3.9"
 
 services:
-  # PostgreSQL Database
   db:
-    image: postgres:17
-    container_name: feedback_db
+    image: postgres:15-alpine
+    container_name: elecantro_db
     environment:
-      POSTGRES_DB: railway
+      POSTGRES_DB: elecantro_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
-    ports:
-      - "54381:54381"
+      POSTGRES_PASSWORD: postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis Cache & Message Broker
   redis:
     image: redis:7-alpine
-    container_name: feedback_redis
+    container_name: elecantro_redis
     ports:
-      - "37661:37661"
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Django Web Application
-  web:
-    build: .
-    container_name: feedback_web
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: elecantro_backend
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
-      - .:/code
+      - ./backend:/app
     ports:
       - "8000:8000"
     environment:
-      - ENV=railway
       - DEBUG=True
-      - DB_NAME=feedback_db
+      - DB_NAME=elecantro_db
       - DB_USER=postgres
-      - DB_PASSWORD=arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
-      - DB_HOST=postgres.railway.internal
-      - DB_PORT=54381
-      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
-      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
+      - DB_PASSWORD=postgres_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  # Celery Worker
-  celery_worker:
-    build: .
-    container_name: feedback_celery_worker
-    command: celery -A core worker -l info
+  worker:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: elecantro_worker
+    command: celery -A core worker -l info -P eventlet
     volumes:
-      - .:/code
+      - ./backend:/app
     environment:
-      - ENV=railway
       - DEBUG=True
-      - DB_NAME=feedback_db
+      - DB_NAME=elecantro_db
       - DB_USER=postgres
-      - DB_PASSWORD=arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
-      - DB_HOST=postgres.railway.internal
-      - DB_PORT=54381
-      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
-      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
+      - DB_PASSWORD=postgres_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
-      - web
+      - backend
       - redis
 
-  # Celery Beat (Scheduler)
-  celery_beat:
-    build: .
-    container_name: feedback_celery_beat
-    command: celery -A core beat -l info
-    volumes:
-      - .:/code
-    environment:
-      - ENV=railway
-      - DEBUG=True
-      - DB_NAME=feedback_db
-      - DB_USER=postgres
-      - DB_PASSWORD=arzwHZZHeDyXvLDpqPbWTGcKLZYOWlNv
-      - DB_HOST=postgres.railway.internal
-      - DB_PORT=54381
-      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
-      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
-    depends_on:
-      - web
-      - redis
-
-  # Flower - Celery Monitoring (Optional)
-  flower:
-    build: .
-    container_name: feedback_flower
-    command: celery -A core flower --port=5555
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: elecantro_frontend
     ports:
-      - "5555:5555"
-    environment:
-      - CELERY_BROKER_URL=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
-      - CELERY_RESULT_BACKEND=redis://default:QHtWmZUFZYZzbaSiTFkOtlaFlHclwGKU@mainline.proxy.rlwy.net:37661
+      - "80:80"
+      - "5173:80"
     depends_on:
-      - redis
-      - celery_worker
+      - backend
 
 volumes:
   postgres_data:

@@ -277,11 +277,11 @@ CACHE_TTL = 60 * 15  # 15 minutes
 
 
 # Allow your React Codespace URL
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://glowing-adventure-jj56v44646jrfqjwq-5173.app.github.dev"
-]
+# CORS Configuration - Configurable via environment variable
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+# Add common local development origins if not explicitly provided
+if "http://localhost:5173" not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append("http://localhost:5173")
 
 # Allow cookies/auth if needed
 CORS_ALLOW_CREDENTIALS = True

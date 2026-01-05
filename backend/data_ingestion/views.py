@@ -298,14 +298,13 @@ class BulkFeedbackUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Update batch status
-            batch.status = 'completed'
-            batch.completed_at = timezone.now()
-            batch.save()
+            # The batch status remains 'processing' so the frontend shows the progress bar
+            # while the background worker processes the AI analysis.
             
             logger.info(
-                f"Batch upload completed: {result['created_count']} created, "
-                f"{result['skipped_count']} skipped by {request.user.username}"
+                f"Batch upload initiated: {result['created_count']} created, "
+                f"{result['skipped_count']} skipped by {request.user.username}. "
+                f"Background processing queued."
             )
             
             return Response({
@@ -481,7 +480,7 @@ class BulkFeedbackUploadView(APIView):
             from data_ingestion.tasks import process_bulk_feedbacks
             
             # Queue the task
-            task = process_bulk_feedbacks.delay(batch_ids)
+            task = process_bulk_feedbacks.delay(batch_ids, batch_id=feedbacks[0].batch_id)
             task_ids_list.append(task.id)
             
             logger.info(f"Batch of {len(batch_ids)} feedbacks created ({len(feedbacks) - len(batch_ids)} duplicates skipped). Task: {task.id}")
