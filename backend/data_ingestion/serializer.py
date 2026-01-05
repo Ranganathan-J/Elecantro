@@ -244,6 +244,10 @@ class FeedbackBatchSerializer(serializers.ModelSerializer):
     entity_name = serializers.CharField(source='entity.name', read_only=True)
     success_rate = serializers.FloatField(read_only=True)
     
+    # Real-time progress fields
+    processed_count = serializers.SerializerMethodField()
+    processed_percentage = serializers.SerializerMethodField()
+    
     class Meta:
         model = FeedbackBatch
         fields = [
@@ -251,13 +255,25 @@ class FeedbackBatchSerializer(serializers.ModelSerializer):
             'uploaded_by_username', 'file_name', 'file_type', 'source',
             'total_rows', 'successful_rows', 'failed_rows',
             'success_rate', 'status', 'error_log',
+            'processed_count', 'processed_percentage',
             'created_at', 'completed_at'
         ]
         read_only_fields = [
             'uploaded_by', 'total_rows', 'successful_rows',
             'failed_rows', 'status', 'error_log',
-            'created_at', 'completed_at'
+            'created_at', 'completed_at',
+            'processed_count', 'processed_percentage'
         ]
+        
+    def get_processed_count(self, obj):
+        return obj.raw_feedbacks.filter(status='processed').count()
+        
+    def get_processed_percentage(self, obj):
+        total = obj.successful_rows # Rows actually inserted
+        if total == 0:
+            return 0
+        processed = self.get_processed_count(obj)
+        return round((processed / total) * 100, 1)
 
 
 class FeedbackStatsSerializer(serializers.Serializer):

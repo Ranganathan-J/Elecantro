@@ -1,95 +1,124 @@
-// src/pages/Login.jsx
-import React, { useState } from "react";
-import { useAuth } from "../hooks/useAuth";
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Bot, LineChart, ShieldCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-function Login() {
-  const { login, loading, error } = useAuth();
-  const [form, setForm] = useState({ username: "", password: "" });
+const Login = () => {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const [tokens, setTokens] = useState(null); // store tokens to show them
+  const { register, handleSubmit, formState: { errors } } = useForm();
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const result = await login(form.name, form.password);
+  const onSubmit = async (data) => {
+    setLoading(true);
+    const result = await login(data.email, data.password);
+    setLoading(false);
 
     if (result.success) {
-      setTokens({
-        access: result.access,
-        refresh: result.refresh,
-      });
+      navigate('/dashboard');
+    } else {
+      alert(result.error); // TODO: Replace with nice toast
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-      <div className="w-full max-w-sm bg-white p-6 rounded-lg shadow">
-        <h2 className="text-2xl font-semibold mb-4 text-center">
-          Login to your account
-        </h2>
+    <div className="min-h-screen grid lg:grid-cols-2 bg-background text-foreground overflow-hidden">
+      {/* Left: Hero Section */}
+      <div className="hidden lg:flex flex-col justify-center items-center bg-slate-900 border-r border-slate-800 p-12 relative overflow-hidden">
+        {/* Background Gradients */}
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background opacity-50" />
+        <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-accent/20 via-background to-background opacity-50" />
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block font-medium mb-1">Email</label>
-            <input
-              type="text"
-              name="text"
-              placeholder="yourname"
-              value={form.email}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border rounded-md focus:ring focus:ring-blue-300"
-            />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="relative z-10 max-w-lg text-center"
+        >
+          <div className="flex justify-center mb-8">
+            <div className="h-20 w-20 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/50 shadow-[0_0_30px_rgba(124,58,237,0.3)]">
+              <Bot size={40} className="text-primary" />
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight mb-4">
+            Analysis at <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Wrapspeed</span>
+          </h1>
+          <p className="text-lg text-muted-foreground mb-8">
+            Ingest thousands of reviews in seconds. Let our AI uncover hidden insights while you sleep.
+          </p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg bg-white/5 border border-white/10 backdrop-blur-sm">
+              <LineChart className="mb-2 text-blue-400" />
+              <h3 className="font-semibold">Real-time Stats</h3>
+              <p className="text-xs text-muted-foreground">Monitor trends instantly</p>
+            </div>
+            <div className="p-4 rounded-lg bg-white/5 border border-white/10 backdrop-blur-sm">
+              <ShieldCheck className="mb-2 text-green-400" />
+              <h3 className="font-semibold">Enterprise Grade</h3>
+              <p className="text-xs text-muted-foreground">Secure & Scalable</p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Right: Login Form */}
+      <div className="flex items-center justify-center p-8">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md space-y-8"
+        >
+          <div className="text-center lg:text-left">
+            <h2 className="text-3xl font-bold">Welcome back</h2>
+            <p className="text-muted-foreground mt-2">Enter your credentials to access your workspace.</p>
           </div>
 
-          <div className="mb-4">
-            <label className="block font-medium mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              placeholder="******"
-              value={form.password}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border rounded-md focus:ring focus:ring-blue-300"
-            />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-8">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                {...register("email", { required: "Email is required" })}
+                placeholder="name@company.com"
+                error={errors.email?.message}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-medium">Password</label>
+                <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+              </div>
+              <Input
+                type="password"
+                {...register("password", { required: "Password is required" })}
+                placeholder="••••••••"
+                error={errors.password?.message}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" size="lg" loading={loading}>
+              Sign In
+            </Button>
+          </form>
+
+          <div className="text-center text-sm">
+            Don't have an account?{' '}
+            <Link to="/register" className="font-medium text-primary hover:underline transition-colors">
+              Create an account
+            </Link>
           </div>
-
-          {error && (
-            <p className="text-red-600 text-sm mb-3 text-center">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md 
-              hover:bg-blue-700 disabled:bg-gray-400"
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
-         <p className="text-black">Don't have an account? <a href="/Signup" className="text-blue-700">Sign Up</a></p>
-
-        {/* Show tokens after login */}
-        {tokens && (
-          <div className="mt-6 bg-gray-100 p-3 rounded-lg text-sm break-all">
-            <p className="font-bold">Access Token:</p>
-            <p className="mb-2">{tokens.access}</p>
-
-            <p className="font-bold">Refresh Token:</p>
-            <p>{tokens.refresh}</p>
-          </div>
-        )}
+        </motion.div>
       </div>
     </div>
   );
-}
+};
 
 export default Login;

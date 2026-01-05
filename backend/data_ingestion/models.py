@@ -80,6 +80,15 @@ class RawFeed(models.Model):
         on_delete=models.CASCADE, 
         related_name='raw_feeds'
     )
+
+    batch = models.ForeignKey(
+        'FeedbackBatch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='raw_feedbacks',
+        help_text="The batch this feedback belongs to"
+    )
     
     # Core Fields
     text = models.TextField(help_text="Raw feedback text")
@@ -128,6 +137,16 @@ class RawFeed(models.Model):
         choices=STATUS_CHOICES, 
         default='new'
     )
+    
+    # Deduplication hash
+    content_hash = models.CharField(
+        max_length=64, 
+        null=True, 
+        blank=True, 
+        db_index=True,
+        help_text="SHA256 hash of text for deduplication"
+    )
+
     error_message = models.TextField(
         null=True, 
         blank=True,

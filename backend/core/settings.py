@@ -28,7 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-*fo$(mm@y)$nl^p4u-09)4htzg_x%^=bb!#$!!*e!2ezzh5j9q'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 
 # Application definition
@@ -88,9 +88,10 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 
-ENV = os.getenv("ENV", "local")
-if ENV == "railway":
-    db_url = os.getenv("RAILWAY_DB_URL") 
+# Prefer a single DATABASE_URL (used by Render, Railway, Heroku, etc.).
+# Fall back to discrete env vars for local/dev Postgres.
+db_url = os.getenv("RENDER_DB_URL") or os.getenv("DATABASE_URL")
+if db_url:
     DATABASES = {
         "default": dj_database_url.parse(db_url, conn_max_age=600, ssl_require=True)
     }
@@ -257,15 +258,38 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 # ==================== END CELERY CONFIGURATION ====================
 
 
+# ==================== CACHING CONFIGURATION (REDIS) ====================
+# Day 14: Caching for Performance
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.getenv("RAILWAY_REDIS_URL"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "IGNORE_EXCEPTIONS": True,  # Don't crash if Redis is down
+        }
+    }
+}
+
+# Cache time to live (in seconds)
+CACHE_TTL = 60 * 15  # 15 minutes
+# ==================== END CACHING CONFIGURATION ====================
+
+
 # Allow your React Codespace URL
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:5173",
     "https://glowing-adventure-jj56v44646jrfqjwq-5173.app.github.dev"
 ]
 
 # Allow cookies/auth if needed
 CORS_ALLOW_CREDENTIALS = True
-# CORS_ALLOW_ALL_ORIGINS = True
+# During development allow the Codespaces preview origins via a regex
+# and enable permissive CORS when DEBUG is True so preflight requests
+# get proper Access-Control headers. Do NOT enable in production.
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^https://.*\\.github\\.dev$"]
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_HEADERS = ["*"]
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
 
@@ -275,6 +299,17 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
 ]
+# If deployed on Render the platform exposes the external hostname
+render_host = os.getenv("RENDER_DB_URL")
+if render_host:
+    ALLOWED_HOSTS.append(render_host)
+# Allow additional hosts via comma-separated env var `ALLOWED_HOSTS`
+extra_hosts = os.getenv("ALLOWED_HOSTS", "")
+if extra_hosts:
+    ALLOWED_HOSTS.extend([h.strip() for h in extra_hosts.split(",") if h.strip()])
+
+# Respect X-Forwarded-Proto header (Render terminates TLS at the load balancer)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # File Upload Settings

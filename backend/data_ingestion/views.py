@@ -61,24 +61,8 @@ class BusinessEntityViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        """Create feedback and trigger AI processing"""
-        # Verify user owns the entity
-        entity = serializer.validated_data['entity']
-        if not self.request.user.is_admin and entity.owner != self.request.user:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("You don't have permission to add feedback to this entity.")
-        
-        instance = serializer.save()
-        logger.info(f"Feedback created: #{instance.id} by {self.request.user.username}")
-        
-        # ✅ ADD THIS: Trigger AI processing
-        from data_ingestion.tasks import process_feedback_with_ai
-        try:
-            task = process_feedback_with_ai.delay(instance.id)
-            logger.info(f"AI processing queued for feedback #{instance.id}. Task ID: {task.id}")
-        except Exception as e:
-            logger.error(f"Failed to queue AI processing: {str(e)}")
-            # Don't fail the request if queuing fails
+        serializer.save(owner=self.request.user)
+        logger.info(f"Business Entity created: {serializer.validated_data.get('name')} by {self.request.user.username}")
     
     @action(detail=True, methods=['get'])
     def statistics(self, request, pk=None):
@@ -368,9 +352,16 @@ class BulkFeedbackUploadView(APIView):
         return self._create_feedbacks_from_rows(data, entity, source, batch)
     
     def _create_feedbacks_from_rows(self, rows, entity, source, batch):
-        """Create RawFeed objects from rows and trigger AI processing"""
-        created_feedbacks = []
+        """Create RawFeed objects from rows using bulk_create and trigger AI processing"""
+        feedbacks_to_create = []
         skipped_rows = []
+        created_ids = []
+        task_ids = []
+        BATCH_SIZE = 1000
+        
+        # Pre-fetch existing hashes to avoid N+1 queries (optimization)
+        # For huge files, we might need to do this in chunks, but for now this is okay
+        import hashlib
         
         for index, row in enumerate(rows, start=1):
             # Map common column names (flexible)
@@ -392,6 +383,14 @@ class BulkFeedbackUploadView(APIView):
                 continue
             
             try:
+                # Generate Hash for deduplication
+                clean_text = str(text).strip()
+                text_hash = hashlib.sha256(clean_text.encode('utf-8')).hexdigest()
+                
+                # Check for duplicates in current batch (creating list)
+                if any(f.content_hash == text_hash for f in feedbacks_to_create):
+                    continue
+                
                 # Extract rating
                 rating_value = row.get('rating')
                 if rating_value:
@@ -402,18 +401,26 @@ class BulkFeedbackUploadView(APIView):
                     except (ValueError, TypeError):
                         rating_value = None
                 
-                feedback = RawFeed.objects.create(
+                # Create instance but don't save yet
+                feedback = RawFeed(
                     entity=entity,
-                    text=str(text).strip(),
+                    text=clean_text,
+                    content_hash=text_hash,
                     source=row.get('source', source),
                     product_name=row.get('product_name'),
                     customer_name=row.get('customer_name'),
                     customer_email=row.get('customer_email'),
                     rating=rating_value,
                     external_id=row.get('external_id') or row.get('id'),
-                    status='new'
+                    status='new',
+                    batch=batch  # Link to batch
                 )
-                created_feedbacks.append(feedback)
+                feedbacks_to_create.append(feedback)
+                
+                # If batch is full, save and queue
+                if len(feedbacks_to_create) >= BATCH_SIZE:
+                    self._save_and_queue_batch(feedbacks_to_create, created_ids, task_ids)
+                    feedbacks_to_create = []
                 
             except Exception as e:
                 error = {
@@ -423,44 +430,65 @@ class BulkFeedbackUploadView(APIView):
                 skipped_rows.append(error)
                 batch.error_log.append(error)
         
+        # Process remaining feedbacks
+        if feedbacks_to_create:
+            self._save_and_queue_batch(feedbacks_to_create, created_ids, task_ids)
+        
         # Update batch statistics
         batch.total_rows = index
-        batch.successful_rows = len(created_feedbacks)
+        batch.successful_rows = len(created_ids)
         batch.failed_rows = len(skipped_rows)
         batch.save()
         
-        # ✅ NEW: Trigger bulk AI processing
-        if created_feedbacks:
-            from data_ingestion.tasks import process_bulk_feedbacks
-            feedback_ids = [f.id for f in created_feedbacks]
-            
-            try:
-                # Queue all feedbacks for AI processing
-                task = process_bulk_feedbacks.delay(feedback_ids)
-                logger.info(
-                    f"Bulk AI processing queued for {len(feedback_ids)} feedbacks. "
-                    f"Task ID: {task.id}"
-                )
-                processing_status = 'queued'
-                processing_task_id = task.id
-            except Exception as e:
-                logger.error(f"Failed to queue bulk AI processing: {str(e)}")
-                processing_status = 'failed_to_queue'
-                processing_task_id = None
-        else:
-            processing_status = 'none'
-            processing_task_id = None
-        
         return {
             'message': 'Bulk upload completed',
-            'created_count': len(created_feedbacks),
+            'created_count': len(created_ids),
             'skipped_count': len(skipped_rows),
-            'processing_status': processing_status,
-            'processing_task_id': processing_task_id,
-            'created_ids': [f.id for f in created_feedbacks],
+            'processing_status': 'queued' if task_ids else 'none',
+            'processing_task_ids': task_ids,
+            'created_ids': created_ids, 
             'skipped_rows': skipped_rows[:20],  # Return first 20 errors
             'total_errors': len(skipped_rows)
         }
+
+    def _save_and_queue_batch(self, feedbacks, created_ids_list, task_ids_list):
+        """Helper to bulk create feedbacks and queue AI task"""
+        if not feedbacks:
+            return
+
+        try:
+            # Check DB for duplicates before inserting
+            hashes = [f.content_hash for f in feedbacks]
+            existing_hashes = set(RawFeed.objects.filter(
+                content_hash__in=hashes, 
+                entity=feedbacks[0].entity
+            ).values_list('content_hash', flat=True))
+            
+            # Filter out duplicates
+            unique_feedbacks = [f for f in feedbacks if f.content_hash not in existing_hashes]
+            
+            if not unique_feedbacks:
+                logger.info(f"Skipped batch of {len(feedbacks)} - all duplicates")
+                return
+
+            # Bulk create records
+            created_objs = RawFeed.objects.bulk_create(unique_feedbacks)
+            
+            batch_ids = [f.id for f in created_objs]
+            created_ids_list.extend(batch_ids)
+            
+            # Queue AI processing for this batch
+            from data_ingestion.tasks import process_bulk_feedbacks
+            
+            # Queue the task
+            task = process_bulk_feedbacks.delay(batch_ids)
+            task_ids_list.append(task.id)
+            
+            logger.info(f"Batch of {len(batch_ids)} feedbacks created ({len(feedbacks) - len(batch_ids)} duplicates skipped). Task: {task.id}")
+            
+        except Exception as e:
+            logger.error(f"Error in batch save/queue: {str(e)}")
+            pass
 
 
 class FeedbackStatsView(APIView):
@@ -474,8 +502,22 @@ class FeedbackStatsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
+        from django.core.cache import cache
+        from django.conf import settings
+        
         user = request.user
         entity_id = request.query_params.get('entity_id')
+        
+        # Create a unique cache key based on params
+        cache_key = f"feedback_stats_{user.id}_{entity_id or 'all'}"
+        
+        # Try to get from cache first
+        cached_stats = cache.get(cache_key)
+        if cached_stats:
+            logger.info(f"⚡ Serving stats from cache: {cache_key}")
+            return Response(cached_stats)
+        
+        logger.info(f"🔄 Computing fresh stats for: {cache_key}")
         
         # Get feedbacks based on user permissions
         if user.is_admin:
@@ -511,7 +553,12 @@ class FeedbackStatsView(APIView):
         }
         
         serializer = FeedbackStatsSerializer(stats)
-        return Response(serializer.data)
+        data = serializer.data
+        
+        # Cache the result
+        cache.set(cache_key, data, timeout=getattr(settings, 'CACHE_TTL', 900))
+        
+        return Response(data)
     
     def _get_daily_trend(self, queryset):
         """Get feedback count for last 7 days"""
@@ -529,16 +576,18 @@ class FeedbackStatsView(APIView):
         return trend
 
 
-class FeedbackBatchViewSet(viewsets.ReadOnlyModelViewSet):
+class FeedbackBatchViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for viewing Feedback Batches.
+    ViewSet for managing Feedback Batches.
     
     list: GET /api/data-ingestion/batches/
     retrieve: GET /api/data-ingestion/batches/{id}/
+    destroy: DELETE /api/data-ingestion/batches/{id}/
     """
     serializer_class = FeedbackBatchSerializer
     permission_classes = [IsAuthenticated]
     ordering = ['-created_at']
+    http_method_names = ['get', 'delete']  # Only allow GET and DELETE
     
     def get_queryset(self):
         user = self.request.user
@@ -551,3 +600,27 @@ class FeedbackBatchViewSet(viewsets.ReadOnlyModelViewSet):
             return FeedbackBatch.objects.select_related(
                 'entity', 'uploaded_by'
             ).filter(uploaded_by=user)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Delete batch and associated raw feeds"""
+        batch = self.get_object()
+        
+        # Count associated feedbacks before deletion
+        feedback_count = batch.raw_feedbacks.count()
+        
+        # Delete associated raw feeds (will also delete processed feedback via CASCADE)
+        batch.raw_feedbacks.all().delete()
+        
+        # Delete the batch itself
+        batch_name = batch.file_name
+        batch.delete()
+        
+        logger.info(
+            f"Batch '{batch_name}' deleted by {request.user.username}. "
+            f"Removed {feedback_count} associated feedbacks."
+        )
+        
+        return Response({
+            'message': f'Batch deleted successfully',
+            'deleted_feedbacks': feedback_count
+        }, status=status.HTTP_200_OK)

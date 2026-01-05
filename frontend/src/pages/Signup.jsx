@@ -1,6 +1,6 @@
 import React,{useState} from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../services/api";
 
 
 
@@ -33,7 +33,7 @@ function Signup() {
     }
 
     try {
-      await axios.post("https://glowing-adventure-jj56v44646jrfqjwq-8000.app.github.dev/api/users/register/", formData);
+      await api.post("/api/users/register/", formData);
       navigate("/login");  // redirect to login after signup
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");

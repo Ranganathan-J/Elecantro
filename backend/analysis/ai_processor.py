@@ -423,6 +423,8 @@ class AIProcessor:
     
     # ==================== DAY 12-13: COMPLETE PIPELINE ====================
     
+    # ==================== DAY 12-13: COMPLETE PIPELINE ====================
+    
     def process_feedback_complete(self, text: str) -> Dict[str, Any]:
         """
         Complete pipeline: sentiment + topics + summary + embeddings + urgency.
@@ -460,6 +462,118 @@ class AIProcessor:
         logger.info(f"✅ Processing complete: {sentiment['label']} | {len(topics)} topics | {urgency['urgency']}")
         
         return result
+
+    def process_batch_complete(self, texts: List[str]) -> List[Dict[str, Any]]:
+        """
+        Batch processing pipeline for multiple texts.
+        optimize performance by batching model inference.
+        
+        Args:
+            texts: List of feedback texts
+            
+        Returns:
+            List of dictionaries with analysis results
+        """
+        if not texts:
+            return []
+            
+        logger.info(f"Batch processing {len(texts)} texts...")
+        
+        results = []
+        
+        # Initialize lists for batch results
+        sentiments = []
+        topics_list = []
+        summaries = []
+        embeddings_list = []
+        urgencies = []
+        
+        # 1. Batch Sentiment Analysis
+        if self.sentiment_analyzer:
+            try:
+                # Truncate texts for BERT
+                truncated_texts = [t[:512] for t in texts]
+                batch_results = self.sentiment_analyzer(truncated_texts)
+                
+                label_map = {
+                    'POSITIVE': 'positive', 'NEGATIVE': 'negative',
+                    'LABEL_1': 'positive', 'LABEL_0': 'negative'
+                }
+                
+                for res in batch_results:
+                    label = label_map.get(res['label'], 'neutral')
+                    sentiments.append({
+                        'label': label,
+                        'score': res['score']
+                    })
+            except Exception as e:
+                logger.error(f"Batch sentiment error: {e}")
+                sentiments = [self._fallback_sentiment(t) for t in texts]
+        else:
+            sentiments = [self._fallback_sentiment(t) for t in texts]
+            
+        # 2. Batch Embeddings
+        if self.embedding_model:
+            try:
+                batch_embeddings = self.embedding_model.encode(
+                    texts,
+                    convert_to_tensor=False,
+                    show_progress_bar=False,
+                    batch_size=32
+                )
+                embeddings_list = batch_embeddings.tolist()
+            except Exception as e:
+                logger.error(f"Batch embedding error: {e}")
+                embeddings_list = [self._fallback_embeddings() for _ in texts]
+        else:
+            embeddings_list = [self._fallback_embeddings() for _ in texts]
+            
+        # 3. Batch Summarization
+        # T5 is heavy, process in smaller sub-batches to avoid OOM
+        if self.summarizer:
+            try:
+                summaries = []
+                # Filter long texts only
+                for t in texts:
+                    if len(t) > 100:
+                        try:
+                            res = self.summarizer(t[:1024], max_length=150, min_length=30, do_sample=False)
+                            summaries.append(res[0]['summary_text'])
+                        except:
+                            summaries.append(t[:150] + "...")
+                    else:
+                        summaries.append(t)
+            except Exception as e:
+                logger.error(f"Batch summarization error: {e}")
+                summaries = [self._fallback_summary(t, 150) for t in texts]
+        else:
+            summaries = [self._fallback_summary(t, 150) for t in texts]
+            
+        # 4. Topics (KeyBERT supports list, but looping is safer for now due to potential errors)
+        for t in texts:
+            topics_list.append(self.extract_topics(t, top_n=5))
+            
+        # 5. Urgency (Zero-shot is heavy, maybe skip for batch or loop)
+        for t in texts:
+            urgencies.append(self.classify_urgency(t))
+            
+        # Compile results
+        for i in range(len(texts)):
+            result = {
+                'sentiment': sentiments[i]['label'],
+                'sentiment_score': sentiments[i]['score'],
+                'topics': topics_list[i],
+                'summary': summaries[i],
+                'embeddings': embeddings_list[i],
+                'key_phrases': topics_list[i][:3],
+                'urgency': urgencies[i]['urgency'],
+                'urgency_score': urgencies[i]['score'],
+                'model_version': 'huggingface_v1.0'
+            }
+            results.append(result)
+            
+        logger.info(f"✅ Batch processing complete for {len(texts)} texts")
+        return results
 
 
 # Singleton instance

@@ -174,38 +174,119 @@ def process_feedback_with_ai(self, feedback_id):
 
 
 
+@shared_task(bind=True, max_retries=3)
+def process_batch_task(self, feedback_ids):
+    """
+    Process a small batch of feedbacks (e.g. 20-50) using batch AI inference.
+    """
+    from data_ingestion.models import RawFeed
+    from analysis.models import ProcessedFeedback
+    from analysis.ai_processor import get_ai_processor
+    from django.db import transaction
+    
+    start_time = time.time()
+    logger.info(f"🚀 Starting batch AI processing for {len(feedback_ids)} feedbacks")
+    
+    try:
+        # Fetch objects
+        raw_feeds = list(RawFeed.objects.filter(id__in=feedback_ids))
+        
+        if not raw_feeds:
+            return {'status': 'empty', 'count': 0}
+
+        # Update status to processing
+        RawFeed.objects.filter(id__in=feedback_ids).update(status='processing')
+
+        # Extract texts
+        texts = [f.text for f in raw_feeds]
+        
+        # Batch AI Processing
+        processor = get_ai_processor()
+        ai_results_list = processor.process_batch_complete(texts)
+        
+        processed_objects = []
+        raw_feed_updates = []
+        
+        # Prepare objects for bulk create/update
+        current_time = timezone.now()
+        processing_time_per_item = (time.time() - start_time) / len(raw_feeds)
+        
+        for raw_feed, result in zip(raw_feeds, ai_results_list):
+            # Prepare ProcessedFeedback
+            pf = ProcessedFeedback(
+                raw_feed=raw_feed,
+                sentiment=result['sentiment'],
+                sentiment_score=result['sentiment_score'],
+                topics=result['topics'],
+                embeddings=result['embeddings'],
+                summary=result['summary'],
+                key_phrases=result['key_phrases'],
+                urgency=result.get('urgency', 'medium'),
+                urgency_score=result.get('urgency_score', 0.5),
+                processing_time=processing_time_per_item,
+                model_version=result['model_version']
+            )
+            processed_objects.append(pf)
+            
+            # Update RawFeed
+            raw_feed.status = 'processed'
+            raw_feed.processed_at = current_time
+            raw_feed_updates.append(raw_feed)
+
+        # Bulk Save
+        with transaction.atomic():
+            # Delete existing processed feedbacks to avoid conflicts (if any)
+            ProcessedFeedback.objects.filter(raw_feed_id__in=feedback_ids).delete()
+            ProcessedFeedback.objects.bulk_create(processed_objects)
+            
+            # Bulk update raw feeds
+            RawFeed.objects.bulk_update(raw_feed_updates, ['status', 'processed_at'])
+
+        logger.info(f"✅ Batch processed {len(processed_objects)} feedbacks successfully")
+        return {'status': 'success', 'processed': len(processed_objects)}
+        
+    except Exception as e:
+        logger.error(f"❌ Batch processing failed: {str(e)}")
+        # Mark as failed
+        RawFeed.objects.filter(id__in=feedback_ids).update(
+            status='failed',
+            error_message=str(e)[:500]
+        )
+        raise self.retry(exc=e, countdown=60)
+
+
 @shared_task
 def process_bulk_feedbacks(feedback_ids):
     """
-    Process multiple feedbacks in bulk.
+    Process multiple feedbacks in bulk by splitting into efficient batches.
     
     Args:
         feedback_ids: List of RawFeed IDs to process
     """
-    logger.info(f"📦 Processing bulk upload: {len(feedback_ids)} feedbacks")
+    BATCH_SIZE = 20  # Process 20 items per task to optimize AI batching
+    
+    logger.info(f"📦 Processing bulk upload: {len(feedback_ids)} feedbacks in batches of {BATCH_SIZE}")
+    
+    # Split into chunks
+    chunks = [feedback_ids[i:i + BATCH_SIZE] for i in range(0, len(feedback_ids), BATCH_SIZE)]
     
     results = {
         'total': len(feedback_ids),
-        'queued': 0,
-        'failed': 0,
-        'task_ids': []
+        'batches': len(chunks),
+        'queued_batches': 0,
+        'failed_batches': 0,
     }
     
-    for feedback_id in feedback_ids:
+    for chunk in chunks:
         try:
-            task = process_feedback_with_ai.delay(feedback_id)
-            results['task_ids'].append({
-                'feedback_id': feedback_id,
-                'task_id': task.id
-            })
-            results['queued'] += 1
+            process_batch_task.delay(chunk)
+            results['queued_batches'] += 1
         except Exception as e:
-            logger.error(f"Failed to queue feedback #{feedback_id}: {str(e)}")
-            results['failed'] += 1
+            logger.error(f"Failed to queue batch: {str(e)}")
+            results['failed_batches'] += 1
     
     logger.info(
-        f"✅ Bulk processing queued: {results['queued']} success, "
-        f"{results['failed']} failed"
+        f"✅ Bulk processing distributed: {results['queued_batches']} batches queued"
     )
     
     return results
