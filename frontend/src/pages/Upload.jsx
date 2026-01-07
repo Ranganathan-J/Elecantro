@@ -312,6 +312,7 @@ const Upload = () => {
                                                         value={batch.processed_percentage}
                                                         label="AI Processing"
                                                         indicatorClassName="bg-blue-500"
+                                                        isActive={batch.status === 'processing'}
                                                     />
                                                 ) : batch.status === 'completed' ? (
                                                     <div className="flex items-center text-sm text-green-500 gap-2 justify-end">
