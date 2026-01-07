@@ -220,9 +220,10 @@ SWAGGER_SETTINGS = {
 # ==================== CELERY CONFIGURATION ====================
 # Add these settings to your core/settings.py file
 
-# Celery Broker and Backend
-CELERY_BROKER_URL =  os.getenv("RAILWAY_REDIS_URL")
-CELERY_RESULT_BACKEND = os.getenv("RAILWAY_REDIS_URL")
+# Celery Broker and Backend (default to local docker-compose Redis)
+_REDIS_URL = os.getenv("REDIS_URL") or "redis://redis:6379/0"
+CELERY_BROKER_URL = _REDIS_URL
+CELERY_RESULT_BACKEND = _REDIS_URL
 # Celery Task Serialization
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -263,7 +264,7 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv("RAILWAY_REDIS_URL"),
+        "LOCATION": _REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "IGNORE_EXCEPTIONS": True,  # Don't crash if Redis is down
