@@ -38,11 +38,18 @@ COPY --from=builder /app/requirements.txt .
 # Install packages
 RUN pip install --no-cache /wheels/*
 
+# Hugging Face / transformers cache dirs (writable for appuser)
+ENV HF_HOME=/app/.cache/huggingface
+ENV TRANSFORMERS_CACHE=/app/.cache/huggingface
+ENV SENTENCE_TRANSFORMERS_HOME=/app/.cache/huggingface
+ENV TORCH_HOME=/app/.cache/torch
+
 # Copy application code
 COPY . .
 
-# Set ownership to non-root user
-RUN chown -R appuser:appuser /app
+# Prepare writable cache dirs and set ownership to non-root user
+RUN mkdir -p /app/.cache/huggingface /app/.cache/torch \
+    && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
