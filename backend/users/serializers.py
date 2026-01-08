@@ -28,7 +28,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    """Serializer for user registration"""
+    """Serializer for user registration - new users default to 'viewer' role"""
     
     password = serializers.CharField(
         write_only=True,
@@ -46,7 +46,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'username', 'email', 'password', 'password_confirm',
-            'first_name', 'last_name', 'role', 'phone', 'company'
+            'first_name', 'last_name', 'phone', 'company'
         ]
         extra_kwargs = {
             'email': {'required': True},
@@ -75,9 +75,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """Create user with hashed password"""
+        """Create user with hashed password - force role to 'viewer' for new registrations"""
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
+        
+        # Force new users to be 'viewer' - only admins can promote to admin/analyst
+        validated_data['role'] = 'viewer'
         
         user = User.objects.create(**validated_data)
         user.set_password(password)

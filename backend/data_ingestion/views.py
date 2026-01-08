@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from drf_spectacular.utils import extend_schema, OpenApiTypes
 from django.db.models import Count, Avg, Q
 from django.utils import timezone
 from datetime import timedelta
@@ -46,7 +47,7 @@ class BusinessEntityViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # Admins can see all entities, others only their own
+        # Regular users only see their own entities; admins can see all for management
         if user.is_admin:
             queryset = BusinessEntity.objects.all()
         else:
@@ -245,6 +246,11 @@ class BulkFeedbackUploadView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+        request=FileUploadSerializer,
+        responses=OpenApiTypes.OBJECT,
+        summary="Bulk feedback upload"
+    )
     def post(self, request, *args, **kwargs):
         serializer = FileUploadSerializer(data=request.data)
         
@@ -500,6 +506,10 @@ class FeedbackStatsView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+        responses=FeedbackStatsSerializer,
+        summary="Feedback statistics"
+    )
     def get(self, request):
         from django.core.cache import cache
         from django.conf import settings

@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
-import { Menu, X, LogOut, BarChart3, User } from "lucide-react"
+import { Menu, X, LogOut, BarChart3, User, Users } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 
 export default function NavBar() {
@@ -17,6 +17,21 @@ export default function NavBar() {
   }
 
   const isActive = (path) => location.pathname === path
+
+  // Check if user is admin - use useMemo to ensure reactivity
+  const isAdmin = useMemo(() => {
+    if (!user) return false
+    const role = user.role || (user.user && user.user.role)
+    console.log('NavBar - user:', user)
+    console.log('NavBar - role:', role, 'isAdmin:', role === 'admin')
+    return role === 'admin'
+  }, [user])
+
+  // Debug: Log user data to help troubleshoot
+  console.log('NavBar Render - user:', user?.username, 'isAdmin:', isAdmin, 'isAuthenticated:', isAuthenticated)
+
+  // TEMP: Force isAdmin for testing
+  const debugIsAdmin = true // Change this to false to test non-admin view
 
   if (location.pathname === "/" && !isAuthenticated) {
     return null
@@ -45,6 +60,17 @@ export default function NavBar() {
                   <BarChart3 size={18} />
                   <span>Dashboard</span>
                 </Link>
+                {(isAdmin || debugIsAdmin) && (
+                  <Link
+                    to="/users"
+                    className={`flex items-center space-x-1 transition-colors ${
+                      isActive("/users") ? "text-primary" : "text-gray-300 hover:text-primary"
+                    }`}
+                  >
+                    <Users size={18} />
+                    <span>Users</span>
+                  </Link>
+                )}
                 <Link
                   to="/profile"
                   className={`flex items-center space-x-1 transition-colors ${
@@ -107,6 +133,15 @@ export default function NavBar() {
                 >
                   Dashboard
                 </Link>
+                {(isAdmin || debugIsAdmin) && (
+                  <Link
+                    to="/users"
+                    className="block text-gray-300 hover:text-primary transition-colors py-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Users
+                  </Link>
+                )}
                 <Link
                   to="/profile"
                   className="block text-gray-300 hover:text-primary transition-colors py-2"

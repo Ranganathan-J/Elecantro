@@ -6,7 +6,10 @@ from .views import (
     ChangePasswordView,
     UserLogoutView,
     UserListView,
-    UserDetailView, CustomTokenObtainPairView
+    UserDetailView,
+    PromoteUserView,
+    DemoteUserView,
+    CustomTokenObtainPairView
 )
 
 urlpatterns = [
@@ -24,4 +27,6 @@ urlpatterns = [
     # User Management (Admin)
     path('list/', UserListView.as_view(), name='user-list'),
     path('<int:pk>/', UserDetailView.as_view(), name='user-detail'),
+    path('promote/', PromoteUserView.as_view(), name='promote-user'),
+    path('demote/', DemoteUserView.as_view(), name='demote-user'),
 ]

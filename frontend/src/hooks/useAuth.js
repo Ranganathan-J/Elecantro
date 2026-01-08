@@ -2,7 +2,7 @@
 import { useState } from "react";
 import api from "../services/api";
 
-export function useAuth() {
+export function useAuthLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 

@@ -7,6 +7,9 @@ import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Insights from './pages/Insights';
 import Settings from './pages/Settings';
+import UserManagement from './pages/UserManagement';
+import RulesManagement from './pages/RulesManagement';
+import Profile from './pages/Profile';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -38,6 +41,9 @@ function App() {
         <Route path="upload" element={<Upload />} />
         <Route path="insights" element={<Insights />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="users" element={<UserManagement />} />
+        <Route path="rules" element={<RulesManagement />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" />} />

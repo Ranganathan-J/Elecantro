@@ -9,7 +9,9 @@ import {
     LogOut,
     Menu,
     X,
-    Bot
+    Bot,
+    Users,
+    Shield
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
@@ -40,12 +42,24 @@ const DashboardLayout = () => {
     const { user, logout } = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
+    // Check if current user is admin
+    const userRole = user?.role || user?.user?.role;
+    const isAdmin = userRole === 'admin';
+
     const navItems = [
         { to: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
         { to: '/upload', icon: UploadCloud, label: 'Ingestion Hub' },
         { to: '/insights', icon: LineChart, label: 'Insights AI' },
         { to: '/settings', icon: Settings, label: 'Settings' },
     ];
+
+    // Add admin-only items
+    if (isAdmin) {
+        navItems.push(
+            { to: '/users', icon: Users, label: 'User Management' },
+            { to: '/rules', icon: Shield, label: 'Rules Management' }
+        );
+    }
 
     return (
         <div className="min-h-screen bg-background flex text-foreground">

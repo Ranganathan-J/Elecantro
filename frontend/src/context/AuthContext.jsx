@@ -15,7 +15,11 @@ export const AuthProvider = ({ children }) => {
         try {
           // If we have a token, fetch the profile to confirm it's valid and get user info
           const response = await api.get('/api/users/profile/');
-          setUser(response.data);
+          // Handle both response.data and response.data.user structures
+          const userData = response.data.user || response.data;
+          console.log('AuthContext - Profile Response:', response.data);
+          console.log('AuthContext - User Data:', userData);
+          setUser(userData);
         } catch (error) {
           console.error("Session restore failed", error);
           logout();
@@ -79,8 +83,10 @@ export const AuthProvider = ({ children }) => {
     window.location.href = '/login';
   };
 
+  const isAuthenticated = !!user && !!token;
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, loading, isAuthenticated }}>
       {!loading && children}
     </AuthContext.Provider>
   );

@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
 from django.db.models import Count, Avg, Q, F
 from django.utils import timezone
 from datetime import timedelta
@@ -460,6 +461,10 @@ class DashboardAnalyticsView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+        responses=AnalyticsSerializer,
+        summary="Dashboard analytics"
+    )
     def get(self, request):
         entity_id = request.query_params.get('entity_id')
         days = int(request.query_params.get('days', 30))
@@ -677,6 +682,10 @@ class TopicAnalyticsView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+        responses=TopicAnalyticsSerializer,
+        summary="Topic analytics"
+    )
     def get(self, request, topic):
         entity_id = request.query_params.get('entity_id')
         days = int(request.query_params.get('days', 30))
@@ -783,6 +792,10 @@ class ProductAnalyticsView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+        responses=ProductAnalyticsSerializer,
+        summary="Product analytics"
+    )
     def get(self, request, product_name):
         entity_id = request.query_params.get('entity_id')
         days = int(request.query_params.get('days', 30))

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema, OpenApiTypes
 from .serializers import (
     UserSerializer, UserCreateSerializer, 
     UserUpdateSerializer, ChangePasswordSerializer, UserLoginSerilazers
@@ -126,6 +127,11 @@ class ChangePasswordView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
     
+    @extend_schema(
+        request=ChangePasswordSerializer,
+        responses=OpenApiTypes.OBJECT,
+        summary="Change password"
+    )
     def post(self, request):
         serializer = ChangePasswordSerializer(
             data=request.data,
@@ -155,6 +161,11 @@ class UserLogoutView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
     
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+        summary="User logout"
+    )
     def post(self, request):
         try:
             refresh_token = request.data.get("refresh")
@@ -234,6 +245,13 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         return User.objects.filter(id=self.request.user.id)
     
     def destroy(self, request, *args, **kwargs):
+        # Only admins can delete users
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can delete users"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         user = self.get_object()
         
         # Prevent self-deletion
@@ -252,3 +270,155 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
             {"message": f"User {username} deleted successfully"},
             status=status.HTTP_200_OK
         )
+
+
+class PromoteUserView(APIView):
+    """
+    Promote a user to admin or analyst role (admin only).
+    
+    POST /api/users/promote/
+    {
+        "user_id": 1,
+        "role": "admin"  // or "analyst"
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+        summary="Promote user role (admin only)"
+    )
+    def post(self, request):
+        # Only admins can promote users
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can promote users"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        user_id = request.data.get('user_id')
+        new_role = request.data.get('role')
+        
+        if not user_id or not new_role:
+            return Response(
+                {"error": "user_id and role are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate role
+        valid_roles = ['admin', 'analyst', 'viewer']
+        if new_role not in valid_roles:
+            return Response(
+                {"error": f"Invalid role. Must be one of: {', '.join(valid_roles)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Prevent self-demotion from admin
+        if user_id == request.user.id and new_role != 'admin':
+            return Response(
+                {"error": "You cannot demote yourself from admin"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(id=user_id)
+            old_role = user.role
+            user.role = new_role
+            user.save()
+            
+            logger.info(
+                f"User {user.username} promoted from {old_role} to {new_role} "
+                f"by {request.user.username}"
+            )
+            
+            return Response({
+                'message': f'User {user.username} promoted to {new_role}',
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class DemoteUserView(APIView):
+    """
+    Demote a user from admin role (admin only).
+    
+    POST /api/users/demote/
+    {
+        "user_id": 1,
+        "role": "analyst"  // or "viewer" - cannot be "admin"
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses=OpenApiTypes.OBJECT,
+        summary="Demote user from admin (admin only)"
+    )
+    def post(self, request):
+        # Only admins can demote users
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can demote users"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        user_id = request.data.get('user_id')
+        new_role = request.data.get('role', 'viewer')
+        
+        if not user_id:
+            return Response(
+                {"error": "user_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate role - cannot demote to admin
+        valid_roles = ['analyst', 'viewer']
+        if new_role not in valid_roles:
+            return Response(
+                {"error": f"Invalid role for demotion. Must be one of: {', '.join(valid_roles)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Prevent self-demotion
+        if user_id == request.user.id:
+            return Response(
+                {"error": "You cannot demote yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Check if user is actually an admin
+            if user.role != 'admin':
+                return Response(
+                    {"error": f"User {user.username} is not an admin (current role: {user.role})"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            old_role = user.role
+            user.role = new_role
+            user.save()
+            
+            logger.info(
+                f"User {user.username} demoted from {old_role} to {new_role} "
+                f"by {request.user.username}"
+            )
+            
+            return Response({
+                'message': f'User {user.username} demoted from admin to {new_role}',
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
