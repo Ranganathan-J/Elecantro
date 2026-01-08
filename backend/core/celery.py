@@ -17,6 +17,11 @@ app.autodiscover_tasks()
 
 app.conf.broker_connection_retry_on_startup = True
 
+# Import monitoring signals (will be loaded when Django is ready)
+try:
+    from .celery_monitoring import *  # noqa: F401,F403
+except ImportError:
+    pass  # Monitoring not available in all environments
 
 # Configure periodic tasks
 app.conf.beat_schedule = {
