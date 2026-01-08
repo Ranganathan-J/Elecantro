@@ -83,9 +83,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: elecantro_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     ports:
       - "80:80"
       - "5173:80"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       - backend
 
