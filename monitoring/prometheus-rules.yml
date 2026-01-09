@@ -1,0 +1,165 @@
+groups:
+  - name: elecantro_alerts
+    rules:
+      # Backend Health Alerts
+      - alert: BackendDown
+        expr: up{job="elecantro-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "Backend service has been down for more than 1 minute"
+
+      - alert: BackendHighErrorRate
+        expr: rate(django_http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on backend"
+          description: "Backend error rate is {{ $value }} errors per second"
+
+      - alert: BackendSlowResponse
+        expr: histogram_quantile(0.95, rate(django_http_requests_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend response time is high"
+          description: "95th percentile response time is {{ $value }} seconds"
+
+      # Database Alerts
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: DatabaseHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connections"
+          description: "Database has {{ $value }} active connections"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      # Health Check Alerts
+      - alert: HealthCheckFailing
+        expr: elecantro_health_status == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health check is failing"
+          description: "Application health check has been failing for 2 minutes"
+
+      # Celery Worker Alerts
+      - alert: CeleryWorkerDown
+        expr: celery_workers_active == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No active Celery workers"
+          description: "No Celery workers have been active for 2 minutes"
+
+      # File Upload Alerts
+      - alert: HighUploadFailureRate
+        expr: rate(django_file_upload_failures_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High file upload failure rate"
+          description: "File upload failure rate is {{ $value }} per second"
+
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}%"
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is {{ $value }}%"
+
+  - name: elecantro_logging
+    rules:
+      # Log-based alerts
+      - alert: HighErrorLogRate
+        expr: rate(log_messages_total{level="error"}[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error log rate"
+          description: "Error log rate is {{ $value }} per second"
+
+      - alert: DatabaseConnectionErrors
+        expr: increase(log_messages_total{message=~"database.*connection.*error"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection errors detected"
+          description: "Database connection errors have been logged"
+
+      - alert: FileUploadErrors
+        expr: increase(log_messages_total{message=~"upload.*error"}[5m]) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "File upload errors detected"
+          description: "File upload errors have been logged multiple times"
+
+      - alert: AuthenticationFailures
+        expr: increase(log_messages_total{message=~"authentication.*failed"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Multiple authentication failures detected"
