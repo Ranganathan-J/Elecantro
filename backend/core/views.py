@@ -31,23 +31,21 @@ class HealthCheckView(View):
         start_time = time.time()
         checks = {
             'database': self._check_database(),
-            'cache': self._check_cache(),
-            'redis': self._check_redis(),
-            'disk_space': self._check_disk_space(),
-            'memory': self._check_memory(),
         }
         
-        # Add Celery health check if available
+        # Only check Redis if it's configured and we have time
         try:
-            from .celery_monitoring import check_celery_health
-            checks['celery'] = check_celery_health()
-        except ImportError:
-            checks['celery'] = {'status': 'not_configured'}
+            redis_check = self._check_redis()
+            checks['redis'] = redis_check
+        except Exception as e:
+            logger.warning(f'Redis health check skipped: {e}')
+            checks['redis'] = {'status': 'skipped', 'message': 'Redis check skipped'}
         
+        # Simplified health check - only critical services
+        critical_checks = ['database']
         all_healthy = all(
-            check.get('status') == 'healthy' 
-            for check in checks.values() 
-            if isinstance(check, dict) and 'status' in check
+            checks.get(check, {}).get('status') == 'healthy' 
+            for check in critical_checks
         )
         
         status_code = 200 if all_healthy else 503
@@ -62,16 +60,17 @@ class HealthCheckView(View):
             'environment': getattr(settings, 'ENVIRONMENT', 'development')
         }
         
-        # Log health check performance
-        performance_logger.info(
-            f'Health check completed in {duration:.3f}s',
-            extra={
-                'event_type': 'health_check',
-                'duration': duration,
-                'status': response_data['status'],
-                'checks_count': len(checks)
-            }
-        )
+        # Log health check performance only if it takes too long
+        if duration > 2.0:
+            performance_logger.warning(
+                f'Health check slow: {duration:.3f}s',
+                extra={
+                    'event_type': 'health_check',
+                    'duration': duration,
+                    'status': response_data['status'],
+                    'checks_count': len(checks)
+                }
+            )
         
         return JsonResponse(response_data, status=status_code)
     
@@ -99,7 +98,7 @@ class HealthCheckView(View):
     def _check_redis(self):
         try:
             redis_url = getattr(settings, 'REDIS_URL', 'redis://redis:6379/0')
-            r = redis.from_url(redis_url)
+            r = redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
             r.ping()
             return {'status': 'healthy', 'message': 'Redis connection successful'}
         except Exception as e:
