@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Upload = () => {
     const queryClient = useQueryClient();
-    const [selectedEntity, setSelectedEntity] = useState(null);
+    const [selectedEntity, setSelectedEntity] = useState('');
     const [dragActive, setDragActive] = useState(false);
     const [uploadError, setUploadError] = useState(null);
 
@@ -29,11 +29,7 @@ const Upload = () => {
         onSuccess: (data) => {
             // Check if paginated or array
             const list = Array.isArray(data) ? data : data.results || [];
-            if (list.length > 0 && !selectedEntity) {
-                setSelectedEntity(list[0].id);
-            } else if (list.length === 0) {
-                // optionally trigger creation ?
-            }
+            // Don't auto-select - let user choose
         }
     });
 
@@ -50,6 +46,7 @@ const Upload = () => {
         },
         onSuccess: (res) => {
             queryClient.invalidateQueries(['entities']);
+            queryClient.invalidateQueries(['batches']);
             setIsCreatingEntity(false);
             setNewEntityName('');
             setSelectedEntity(res.data.id); // Auto-select new entity
@@ -66,6 +63,13 @@ const Upload = () => {
         if (selectedEntity) setUploadError(null);
     }, [selectedEntity]);
 
+    // Get selected entity name for display
+    const selectedEntityName = React.useMemo(() => {
+        if (!selectedEntity) return null;
+        const entity = entityList.find(e => e.id == selectedEntity);
+        return entity?.name || 'Unknown';
+    }, [selectedEntity, entityList]);
+
     const handleCreateEntity = async (e) => {
         e.preventDefault();
         if (!newEntityName.trim()) return;
@@ -73,7 +77,7 @@ const Upload = () => {
     }
 
     // 2. Fetch Batches (Polling)
-    const { data: batches } = useQuery({
+    const { data: batches, refetch: refetchBatches } = useQuery({
         queryKey: ['batches', selectedEntity],
         queryFn: async () => {
             if (!selectedEntity) return [];
@@ -82,7 +86,13 @@ const Upload = () => {
             return Array.isArray(res.data) ? res.data : res.data.results || [];
         },
         enabled: !!selectedEntity,
-        refetchInterval: 2000, // Poll every 2s for progress
+        refetchInterval: (data) => {
+            // Dynamic polling: faster when processing, slower when completed
+            if (!data) return 5000; // Poll every 5s when no data
+            
+            const hasProcessingBatches = data.some(batch => batch.status === 'processing');
+            return hasProcessingBatches ? 2000 : 10000; // 2s when processing, 10s when idle
+        },
     });
 
     // 3. Upload Mutation
@@ -94,16 +104,45 @@ const Upload = () => {
             formData.append('source', 'csv'); // Default
 
             return api.post('/api/data-ingestion/bulk-upload/', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 30000, // 30 second timeout
             });
         },
-        onSuccess: () => {
+        onSuccess: (response) => {
             queryClient.invalidateQueries(['batches']);
             setUploadError(null);
+            // Show success message
+            const batchId = response.data.batch_id;
+            const createdCount = response.data.created_count || 0;
+            console.log(`✅ Upload successful: ${createdCount} items queued for processing (Batch #${batchId})`);
+            
+            // Immediately refetch batches to show new upload
+            setTimeout(() => refetchBatches(), 500);
         },
         onError: (err) => {
-            const msg = err.response?.data?.error || "Upload failed";
-            setUploadError(msg);
+            let errorMessage = "Upload failed";
+            
+            if (err.code === 'ECONNABORTED') {
+                errorMessage = "Upload timed out. Please try again with a smaller file.";
+            } else if (err.response?.status === 413) {
+                errorMessage = "File too large. Maximum size is 10MB.";
+            } else if (err.response?.status === 400) {
+                const errorData = err.response.data;
+                if (errorData?.error) {
+                    errorMessage = errorData.error;
+                } else if (errorData?.file) {
+                    errorMessage = `File error: ${errorData.file[0]}`;
+                } else if (errorData?.entity_id) {
+                    errorMessage = `Entity error: ${errorData.entity_id[0]}`;
+                }
+            } else if (err.response?.status >= 500) {
+                errorMessage = "Server error. Please try again later.";
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            
+            setUploadError(errorMessage);
+            console.error('Upload error:', err);
         }
     });
 
@@ -112,13 +151,24 @@ const Upload = () => {
         mutationFn: async (batchId) => {
             return api.delete(`/api/data-ingestion/batches/${batchId}/`);
         },
-        onSuccess: () => {
+        onSuccess: (response) => {
             queryClient.invalidateQueries(['batches']);
             queryClient.invalidateQueries(['dashboard']); // Refresh dashboard too
+            const deletedCount = response.data?.deleted_feedbacks || 0;
+            console.log(`✅ Batch deleted successfully: ${deletedCount} feedbacks removed`);
         },
         onError: (err) => {
-            const msg = err.response?.data?.error || "Delete failed";
-            alert("Failed to delete batch: " + msg);
+            let errorMessage = "Delete failed";
+            if (err.response?.data?.error) {
+                errorMessage = err.response.data.error;
+            } else if (err.response?.status === 404) {
+                errorMessage = "Batch not found or already deleted";
+            } else if (err.response?.status === 403) {
+                errorMessage = "You don't have permission to delete this batch";
+            } else if (err.response?.status >= 500) {
+                errorMessage = "Server error. Please try again later.";
+            }
+            alert("Failed to delete batch: " + errorMessage);
         }
     });
 
@@ -160,6 +210,7 @@ const Upload = () => {
             setUploadError("Please select a business entity first.");
             return;
         }
+        setUploadError(null);
         uploadMutation.mutate(file);
     };
 
@@ -196,6 +247,7 @@ const Upload = () => {
                                     value={selectedEntity || ''}
                                     onChange={(e) => setSelectedEntity(e.target.value)}
                                 >
+                                    <option value="">Select Business Entity...</option>
                                     {entityList.map(ent => (
                                         <option key={ent.id} value={ent.id}>{ent.name}</option>
                                     ))}
@@ -239,8 +291,15 @@ const Upload = () => {
                     <h3 className="text-xl font-semibold mb-2">
                         {uploadMutation.isPending ? "Uploading..." : "Drag & drop your file here"}
                     </h3>
-                    <p className="text-muted-foreground mb-6 max-w-sm">
+                    <p className="text-muted-foreground mb-2 max-w-sm">
                         Supports CSV, Excel, JSON. Max 10MB.
+                    </p>
+                    {!selectedEntity && (
+                        <p className="text-yellow-600 text-sm mb-4">
+                            ⚠️ Please select a business entity first
+                        </p>
+                    )}
+                    <p className="text-muted-foreground mb-6 max-w-sm">
                         Required columns: <code className="bg-muted px-1 py-0.5 rounded text-xs">text</code> (or review/comment).
                     </p>
 
@@ -261,7 +320,24 @@ const Upload = () => {
                             className="mt-6 p-3 bg-destructive/10 text-destructive rounded-md text-sm flex items-center gap-2"
                         >
                             <AlertCircle size={16} />
-                            {uploadError}
+                            <div>
+                                <div className="font-medium">Upload Failed</div>
+                                <div>{uploadError}</div>
+                            </div>
+                        </motion.div>
+                    )}
+                    
+                    {uploadMutation.isSuccess && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-6 p-3 bg-green-500/10 text-green-500 rounded-md text-sm flex items-center gap-2"
+                        >
+                            <CheckCircle size={16} />
+                            <div>
+                                <div className="font-medium">Upload Successful</div>
+                                <div>File uploaded and queued for AI processing</div>
+                            </div>
                         </motion.div>
                     )}
                 </CardContent>
@@ -269,7 +345,20 @@ const Upload = () => {
 
             {/* Recent Batches */}
             <div>
-                <h2 className="text-xl font-semibold mb-4">Recent Uploads</h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">Recent Uploads</h2>
+                    {selectedEntity && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => refetchBatches()}
+                            className="flex items-center gap-2"
+                        >
+                            <Clock size={14} />
+                            Refresh
+                        </Button>
+                    )}
+                </div>
 
                 <div className="grid gap-4">
                     <AnimatePresence>
@@ -302,27 +391,41 @@ const Upload = () => {
                                             <div className="flex text-xs text-muted-foreground gap-4">
                                                 <span className="flex items-center gap-1"><Clock size={12} /> {formatDate(batch.created_at)}</span>
                                                 <span>{batch.total_rows} rows</span>
+                                                {batch.status === 'processing' && (
+                                                    <span className="text-blue-500">{batch.processed_percentage || 0}% done</span>
+                                                )}
                                             </div>
                                         </div>
 
                                         <div className="w-full md:w-1/3 flex items-center gap-2">
                                             <div className="flex-1">
-                                                {batch.status !== 'completed' && batch.status !== 'failed' ? (
-                                                    <ProgressBar
-                                                        value={batch.processed_percentage}
-                                                        label="AI Processing"
-                                                        indicatorClassName="bg-blue-500"
-                                                        isActive={batch.status === 'processing'}
-                                                    />
+                                                {batch.status === 'processing' ? (
+                                                    <div>
+                                                        <ProgressBar
+                                                            value={batch.processed_percentage || 0}
+                                                            label={`AI Processing: ${batch.processed_percentage || 0}%`}
+                                                            indicatorClassName="bg-blue-500"
+                                                            isActive={true}
+                                                        />
+                                                        <div className="text-xs text-muted-foreground mt-1">
+                                                            {batch.processed_count || 0} of {batch.successful_rows} processed
+                                                            {batch.processed_percentage > 0 && ` (${batch.processed_percentage || 0}%)`}
+                                                        </div>
+                                                    </div>
                                                 ) : batch.status === 'completed' ? (
                                                     <div className="flex items-center text-sm text-green-500 gap-2 justify-end">
                                                         <CheckCircle size={16} />
-                                                        <span>Analysis Complete</span>
+                                                        <span>Analysis Complete ({batch.processed_count || batch.successful_rows} items)</span>
                                                     </div>
-                                                ) : (
+                                                ) : batch.status === 'failed' ? (
                                                     <div className="flex items-center text-sm text-red-500 gap-2 justify-end">
                                                         <AlertCircle size={16} />
-                                                        <span>Failed</span>
+                                                        <span>Failed ({batch.failed_rows} errors)</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center text-sm text-yellow-500 gap-2 justify-end">
+                                                        <Clock size={16} />
+                                                        <span>Queued ({batch.total_rows} rows)</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -344,9 +447,21 @@ const Upload = () => {
                         ))}
                     </AnimatePresence>
 
-                    {(!batches || batches.length === 0) && (
+                    {(!batches || batches.length === 0) && selectedEntity && (
                         <div className="text-center py-12 text-muted-foreground bg-accent/20 rounded-lg border border-dashed border-border">
-                            No uploads found. Start by dropping a file above.
+                            <UploadCloud className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p className="mb-2">No uploads found for {selectedEntityName}</p>
+                            <p className="text-sm">Start by dropping a file above</p>
+                        </div>
+                    )}
+                    
+                    {(!batches || batches.length === 0) && !selectedEntity && (
+                        <div className="text-center py-12 text-muted-foreground bg-accent/20 rounded-lg border border-dashed border-border">
+                            <div className="h-12 w-12 mx-auto mb-4 opacity-50 flex items-center justify-center">
+                                <AlertCircle className="h-6 w-6" />
+                            </div>
+                            <p className="mb-2">Select a business entity to see uploads</p>
+                            <p className="text-sm">Choose an entity from the dropdown above</p>
                         </div>
                     )}
                 </div>

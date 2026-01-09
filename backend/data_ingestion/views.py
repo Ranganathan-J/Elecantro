@@ -443,6 +443,15 @@ class BulkFeedbackUploadView(APIView):
         batch.total_rows = index
         batch.successful_rows = len(created_ids)
         batch.failed_rows = len(skipped_rows)
+        
+        # Update batch status based on whether AI tasks were queued
+        if len(task_ids) > 0:
+            batch.status = 'processing'  # AI processing is happening
+        elif len(created_ids) > 0:
+            batch.status = 'completed'  # Files uploaded but no AI processing (maybe all duplicates)
+        else:
+            batch.status = 'failed'  # No items were created
+        
         batch.save()
         
         return {
@@ -485,15 +494,33 @@ class BulkFeedbackUploadView(APIView):
             # Queue AI processing for this batch
             from data_ingestion.tasks import process_bulk_feedbacks
             
-            # Queue the task
-            task = process_bulk_feedbacks.delay(batch_ids, batch_id=feedbacks[0].batch_id)
-            task_ids_list.append(task.id)
-            
-            logger.info(f"Batch of {len(batch_ids)} feedbacks created ({len(feedbacks) - len(batch_ids)} duplicates skipped). Task: {task.id}")
+            # Queue the task with error handling
+            try:
+                task = process_bulk_feedbacks.delay(batch_ids, batch_id=feedbacks[0].batch_id)
+                task_ids_list.append(task.id)
+                
+                logger.info(f"Batch of {len(batch_ids)} feedbacks created ({len(feedbacks) - len(batch_ids)} duplicates skipped). Task: {task.id}")
+            except Exception as task_error:
+                # If task queuing fails, mark feedbacks as failed so they can be retried
+                logger.error(f"Failed to queue AI task: {str(task_error)}")
+                RawFeed.objects.filter(id__in=batch_ids).update(
+                    status='failed',
+                    error_message='Failed to queue AI processing task'
+                )
             
         except Exception as e:
             logger.error(f"Error in batch save/queue: {str(e)}")
-            pass
+            # Mark feedbacks as failed for retry
+            if feedbacks:
+                try:
+                    RawFeed.objects.filter(
+                        content_hash__in=[f.content_hash for f in feedbacks]
+                    ).update(
+                        status='failed',
+                        error_message='Batch creation failed'
+                    )
+                except:
+                    pass
 
 
 class FeedbackStatsView(APIView):
