@@ -305,6 +305,8 @@ ALLOWED_HOSTS = [
     ".github.dev",      # allow all GitHub Codespaces
     "localhost",
     "127.0.0.1",
+    "0.0.0.0",
+    "backend"
 ]
 # If deployed on Render the platform exposes the external hostname
 render_host = os.getenv("RENDER_DB_URL")
@@ -318,6 +320,7 @@ if extra_hosts:
 # Respect X-Forwarded-Proto header (Render terminates TLS at the load balancer)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# ... (rest of the code remains the same)
 
 # File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
