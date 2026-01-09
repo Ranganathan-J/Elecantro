@@ -35,3 +35,6 @@ echo
 echo "🎯 If all services show ✅, monitoring is working!"
 echo "📈 Access Prometheus UI: http://localhost:9090"
 echo "🔴 Access Redis Commander: http://localhost:8081"
+echo
+echo "🔄 To restart monitoring services:"
+echo "docker-compose -f docker-compose.prod.yml restart prometheus node-exporter redis-exporter postgres-exporter"

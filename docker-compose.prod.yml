@@ -1,10 +1,16 @@
 # Production Docker Compose using Base Images
 # This uses pre-built base images for faster deployments
 
+networks:
+  elecantro-network:
+    driver: bridge
+
 services:
   db:
     image: postgres:15-alpine
     container_name: elecantro_db
+    networks:
+      - elecantro-network
     environment:
       POSTGRES_DB: elecantro_db
       POSTGRES_USER: postgres
@@ -22,6 +28,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: elecantro_redis
+    networks:
+      - elecantro-network
     ports:
       - "6379:6379"
     healthcheck:
@@ -35,6 +43,8 @@ services:
       context: ./backend
       dockerfile: ../docker/backend.Dockerfile
     container_name: elecantro_backend
+    networks:
+      - elecantro-network
     volumes:
       - ./backend:/app
       - ./backend/logs:/app/logs
@@ -62,6 +72,8 @@ services:
       context: ./backend
       dockerfile: ../docker/worker.Dockerfile
     container_name: elecantro_worker
+    networks:
+      - elecantro-network
     volumes:
       - ./backend:/app
       - ./backend/logs:/app/logs
@@ -85,6 +97,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: elecantro_frontend
+    networks:
+      - elecantro-network
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -99,6 +113,8 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: elecantro_prometheus
+    networks:
+      - elecantro-network
     ports:
       - "9090:9090"
     volumes:
@@ -123,6 +139,8 @@ services:
   node-exporter:
     image: prom/node-exporter:latest
     container_name: elecantro_node_exporter
+    networks:
+      - elecantro-network
     ports:
       - "9100:9100"
     command:
@@ -139,6 +157,8 @@ services:
   redis-exporter:
     image: oliver006/redis_exporter:latest
     container_name: elecantro_redis_exporter
+    networks:
+      - elecantro-network
     ports:
       - "9121:9121"
     environment:
@@ -150,6 +170,8 @@ services:
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: elecantro_postgres_exporter
+    networks:
+      - elecantro-network
     ports:
       - "9187:9187"
     environment:
@@ -161,6 +183,8 @@ services:
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: elecantro_redis_commander
+    networks:
+      - elecantro-network
     ports:
       - "8081:8081"
     environment:
