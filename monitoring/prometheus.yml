@@ -21,13 +21,6 @@ scrape_configs:
     scrape_interval: 30s
     scrape_timeout: 10s
 
-  - job_name: 'elecantro-health'
-    static_configs:
-      - targets: ['backend:8000']
-    metrics_path: '/health'
-    scrape_interval: 10s
-    scrape_timeout: 5s
-
   - job_name: 'redis-exporter'
     static_configs:
       - targets: ['redis-exporter:9121']
