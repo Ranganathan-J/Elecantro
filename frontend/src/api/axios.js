@@ -11,9 +11,11 @@ const api = axios.create({
 // Request Interceptor: Attach Token
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+            localStorage.setItem('token', token);
+            localStorage.setItem('accessToken', token);
         }
         return config;
     },
@@ -32,6 +34,7 @@ api.interceptors.response.use(
 
             // Ideally, we would refresh the token here. 
             // For now, simpler flow: logout on 401
+            localStorage.removeItem('token');
             localStorage.removeItem('accessToken');
             localStorage.removeItem('user');
             window.location.href = '/login';

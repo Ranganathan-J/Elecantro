@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../api/axios';
+import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -200,7 +200,7 @@ const Upload = () => {
     };
 
     const handleFile = (file) => {
-        if (!selectedEntity) {
+        if (!selectedEntity || selectedEntity === '') {
             setUploadError("Please select a business entity first.");
             return;
         }

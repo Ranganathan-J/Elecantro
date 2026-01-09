@@ -1,0 +1,24 @@
+text,product_name,customer_name,customer_email,rating
+"This product is amazing! Highly recommend it.",Premium Widget,John Doe,john@example.com,5
+"Great customer service, very responsive team.",Premium Widget,Jane Smith,jane@example.com,4
+"Product quality could be better for the price point.",Budget Widget,Bob Johnson,bob@example.com,3
+"Excellent value for money, will buy again!",Premium Widget,Alice Brown,alice@example.com,5
+"Fast shipping and well packaged product.",Budget Widget,Charlie Wilson,charlie@example.com,4
+"Good product but shipping was delayed.",Budget Widget,Diana Prince,diana@example.com,2
+"Outstanding quality and features.",Premium Widget,Eve Davis,eve@example.com,5
+"Customer support was very helpful with my issue.",Premium Widget,Frank Miller,frank@example.com,4
+"Product works as described, very satisfied.",Budget Widget,Grace Lee,grace@example.com,5
+"Would recommend to friends and family.",Premium Widget,Henry Wilson,henry@example.com,5
+"Good value for budget-conscious shoppers.",Budget Widget,Ivy Chen,ivy@example.com,4
+"Premium quality worth the extra cost.",Premium Widget,Jack Brown,jack@example.com,5
+"Easy to use and setup.",Premium Widget,Kate Davis,kate@example.com,5
+"Received damaged item, customer support resolved quickly.",Budget Widget,Liam Miller,liam@example.com,3
+"Product exceeded my expectations in every way.",Premium Widget,Mia Wilson,mia@example.com,5
+"Fast delivery and great communication.",Budget Widget,Noah Chen,noah@example.com,4
+"Will definitely purchase again.",Premium Widget,Olivia Brown,olivia@example.com,5
+"Good product but minor issues with documentation.",Budget Widget,Parker Lee,parker@example.com,3
+"Excellent build quality and materials.",Premium Widget,Quinn Davis,quinn@example.com,5
+"Helpful customer support team.",Budget Widget,Ruby Wilson,ruby@example.com,4
+"Met all my needs perfectly.",Premium Widget,Stan Smith,stan@example.com,5
+"Quick resolution to my inquiry.",Budget Widget,Violet Johnson,violet@example.com,4
+"Highly recommend this product.",Premium Widget,Xavier Brown,xavier@example.com,5

@@ -255,6 +255,7 @@ class BulkFeedbackUploadView(APIView):
         serializer = FileUploadSerializer(data=request.data)
         
         if not serializer.is_valid():
+            print(f" Upload serializer errors: {serializer.errors}")  # Debug
             return Response(
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
@@ -264,9 +265,14 @@ class BulkFeedbackUploadView(APIView):
         entity_id = serializer.validated_data['entity_id']
         source = serializer.validated_data['source']
         
-        # Verify user owns the entity
+        print(f" Upload request: user={request.user.username}, entity_id={entity_id}, file={file.name}, source={source}")  # Debug
+        
+        # Verify user has permission to upload to entity
         try:
             entity = BusinessEntity.objects.get(id=entity_id)
+            
+            # Admin can upload to any entity
+            # Analyst and Viewer can only upload to their own entities
             if not request.user.is_admin and entity.owner != request.user:
                 return Response(
                     {'error': "You don't have permission to upload to this entity"},

@@ -1,0 +1,18 @@
+// Test script to verify token storage
+console.log('=== Token Storage Test ===');
+
+// Test token setting
+localStorage.setItem('token', 'test-token-123');
+localStorage.setItem('accessToken', 'test-token-123');
+
+// Test token retrieval
+const token1 = localStorage.getItem('token');
+const token2 = localStorage.getItem('accessToken');
+
+console.log('Token from "token" key:', token1);
+console.log('Token from "accessToken" key:', token2);
+console.log('Tokens match:', token1 === token2);
+
+// Clear test tokens
+localStorage.removeItem('token');
+localStorage.removeItem('accessToken');
