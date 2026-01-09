@@ -3,10 +3,7 @@
 FROM elecantro/base:latest
 
 # Copy application code
-COPY . .
-
-# Set ownership for appuser
-RUN chown -R appuser:appuser /app
+COPY --chown=appuser:appuser . .
 
 # Switch to non-root user
 USER appuser

@@ -3,10 +3,11 @@
 FROM elecantro/base:latest
 
 # Copy application code
-COPY . .
+COPY --chown=appuser:appuser . .
 
-# Set ownership for appuser
-RUN chown -R appuser:appuser /app
+# Create logs directory with proper permissions
+RUN mkdir -p /app/logs && \
+    chown appuser:appuser /app/logs
 
 # Switch to non-root user
 USER appuser
