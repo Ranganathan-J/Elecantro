@@ -32,7 +32,7 @@ services:
   backend:
     build: 
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: ../docker/backend.Dockerfile
     container_name: elecantro_backend
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
@@ -60,7 +60,7 @@ services:
   worker:
     build: 
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: ../docker/worker.Dockerfile
     container_name: elecantro_worker
     command: celery -A core worker -l info -P eventlet
     volumes:

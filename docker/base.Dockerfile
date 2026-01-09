@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 RUN useradd --create-home --shell /bin/bash appuser
 
 # Copy requirements first (for better layer caching)
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies with pip cache
 RUN pip install --no-cache-dir --upgrade pip && \
