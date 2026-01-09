@@ -48,7 +48,7 @@ ENV TORCH_HOME=/app/.cache/torch
 COPY . .
 
 # Prepare writable cache dirs and set ownership to non-root user
-RUN mkdir -p /app/.cache/huggingface /app/.cache/torch \
+RUN mkdir -p /app/.cache/huggingface /app/.cache/torch /app/logs \
     && chown -R appuser:appuser /app
 
 # Switch to non-root user
