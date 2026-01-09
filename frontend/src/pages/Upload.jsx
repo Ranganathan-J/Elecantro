@@ -86,13 +86,7 @@ const Upload = () => {
             return Array.isArray(res.data) ? res.data : res.data.results || [];
         },
         enabled: !!selectedEntity,
-        refetchInterval: (data) => {
-            // Dynamic polling: faster when processing, slower when completed
-            if (!data) return 5000; // Poll every 5s when no data
-            
-            const hasProcessingBatches = data.some(batch => batch.status === 'processing');
-            return hasProcessingBatches ? 2000 : 10000; // 2s when processing, 10s when idle
-        },
+        refetchInterval: 3000, // Poll every 3s for progress
     });
 
     // 3. Upload Mutation
