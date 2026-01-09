@@ -54,6 +54,9 @@ RUN mkdir -p /app/.cache/huggingface /app/.cache/torch /app/logs \
 # Switch to non-root user
 USER appuser
 
+# Apply eventlet monkey patching for Celery
+ENV EVENTLET_MONKEY_PATCH=1
+
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
