@@ -346,12 +346,30 @@ class BulkFeedbackUploadView(APIView):
     
     def _process_excel(self, file, entity, source, batch):
         """Process Excel file"""
-        df = pd.read_excel(file)
-        # Replace NaN with None
-        df = df.where(pd.notna(df), None)
-        rows = df.to_dict('records')
-        
-        return self._create_feedbacks_from_rows(rows, entity, source, batch)
+        try:
+            # Try different engines for Excel files
+            engines = ['openpyxl', 'xlrd']
+            df = None
+            
+            for engine in engines:
+                try:
+                    df = pd.read_excel(file, engine=engine)
+                    break
+                except ImportError:
+                    continue
+                except Exception:
+                    continue
+            
+            if df is None:
+                raise ValueError("Unable to read Excel file. Please ensure it's a valid .xlsx or .xls file.")
+            
+            # Replace NaN with None
+            df = df.where(pd.notna(df), None)
+            rows = df.to_dict('records')
+            
+            return self._create_feedbacks_from_rows(rows, entity, source, batch)
+        except Exception as e:
+            raise ValueError(f"Excel processing failed: {str(e)}")
     
     def _process_json(self, file, entity, source, batch):
         """Process JSON file"""
